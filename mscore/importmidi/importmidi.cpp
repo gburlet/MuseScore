@@ -1090,12 +1090,12 @@ void convertMidi(Score *score, const MidiFile *mf)
                   }
             MidiLyrics::extractLyricsToMidiData(mf);
             }
-                  // for newly opened MIDI file - detect if it is a human performance
-                  // if so - detect beats and set initial time signature
-      if (opers.data()->processingsOfOpenedFile == 0)
-            Quantize::setIfHumanPerformance(tracks, sigmap);
-      else        // user value
-            MidiBeat::setTimeSignature(sigmap);
+          // for newly opened MIDI file - detect if it is a human performance
+          // if so - detect beats and set initial time signature
+          if (opers.data()->processingsOfOpenedFile == 0)
+              Quantize::setIfHumanPerformance(tracks, sigmap);
+          // reset time signature to its current value
+          MidiBeat::setTimeSignature(sigmap);
 
       Q_ASSERT_X((opers.data()->trackOpers.isHumanPerformance.value())
                         ? Meter::userTimeSigToFraction(opers.data()->trackOpers.timeSigNumerator.value(),

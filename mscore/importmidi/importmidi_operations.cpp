@@ -204,7 +204,57 @@ static void setOperationsFromFile(const QString &fileName, Opers &opers)
                               }
                         }
                   }
+            else if (xml.name() == "TimeSignature") {
+                xml.readNext();
+                while(!(xml.tokenType() == QXmlStreamReader::EndElement && xml.name() == "TimeSignature")) {
+                    if(xml.tokenType() == QXmlStreamReader::StartElement && xml.name() == "Numerator") {
+                        xml.readNext();
+                        if (xml.tokenType() == QXmlStreamReader::Characters) {
+                            bool ok = false;
+                            const int numeratorVal = xml.text().toString().toInt(&ok);
+                            if (ok) {
+                                std::map<int, TimeSigNumerator> numeratorMap = {
+                                    {2, TimeSigNumerator::_2}, {3, TimeSigNumerator::_3}, {4, TimeSigNumerator::_4},
+                                    {5, TimeSigNumerator::_5}, {6, TimeSigNumerator::_6}, {7, TimeSigNumerator::_7},
+                                    {9, TimeSigNumerator::_9}, {12, TimeSigNumerator::_12}, {15, TimeSigNumerator::_15},
+                                    {21, TimeSigNumerator::_21}
+                                };
+                                
+                                try {
+                                    TimeSigNumerator numerator = numeratorMap.at(numeratorVal);
+                                    opers.timeSigNumerator.setDefaultValue(numerator, false);
+                                } catch(const std::out_of_range& oor) {
+                                    qDebug("Load MIDI import operations from file: "
+                                           "unknown time signature numerator");
+                                }
+                            }
+                        }
+                    } else if (xml.tokenType() == QXmlStreamReader::StartElement && xml.name() == "Denominator") {
+                        xml.readNext();
+                        if (xml.tokenType() == QXmlStreamReader::Characters) {
+                            bool ok = false;
+                            const int denominatorVal = xml.text().toString().toInt(&ok);
+                            if (ok) {
+                                std::map<int, TimeSigDenominator> denominatorMap = {
+                                    {2, TimeSigDenominator::_2}, {4, TimeSigDenominator::_4}, {8, TimeSigDenominator::_8},
+                                    {16, TimeSigDenominator::_16}, {32, TimeSigDenominator::_32}
+                                };
+                                
+                                try {
+                                    TimeSigDenominator denominator = denominatorMap.at(denominatorVal);
+                                    opers.timeSigDenominator.setDefaultValue(denominator, false);
+                                } catch(const std::out_of_range& oor) {
+                                    qDebug("Load MIDI import operations from file: "
+                                           "unknown time signature denominator");
+                                }
+                            }
+                        }
+                    }
+                    xml.readNext();
+                }
+                }
             }
+          
       if (xml.hasError()) {
             qDebug("Load MIDI import operations from file: cannot parse input file");
             return;
