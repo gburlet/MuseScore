@@ -145,6 +145,7 @@ struct Opers
       Op<bool> showChordNames = Op<bool>(true);
       Op<TimeSigNumerator> timeSigNumerator = Op<TimeSigNumerator>(TimeSigNumerator::_4);
       Op<TimeSigDenominator> timeSigDenominator = Op<TimeSigDenominator>(TimeSigDenominator::_4);
+      Op<int> tempo = Op<int>(120);
 
                   // operations for individual tracks
       TrackOp<int> trackIndexAfterReorder = TrackOp<int>(0);
