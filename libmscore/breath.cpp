@@ -36,11 +36,10 @@ const std::vector<BreathType> Breath::breathList {
 //---------------------------------------------------------
 
 Breath::Breath(Score* s)
-  : Element(s)
+   : Element(s, ElementFlag::MOVABLE)
       {
       _symId = SymId::breathMarkComma;
       _pause = 0.0;
-      setFlags(ElementFlag::MOVABLE | ElementFlag::SELECTABLE);
       }
 
 //---------------------------------------------------------
@@ -78,8 +77,8 @@ void Breath::write(XmlWriter& xml) const
       if (!xml.canWrite(this))
             return;
       xml.stag("Breath");
-      writeProperty(xml, P_ID::SYMBOL);
-      writeProperty(xml, P_ID::PAUSE);
+      writeProperty(xml, Pid::SYMBOL);
+      writeProperty(xml, Pid::PAUSE);
       Element::writeProperties(xml);
       xml.etag();
       }
@@ -144,12 +143,12 @@ QPointF Breath::pagePos() const
 //   getProperty
 //---------------------------------------------------------
 
-QVariant Breath::getProperty(P_ID propertyId) const
+QVariant Breath::getProperty(Pid propertyId) const
       {
       switch (propertyId) {
-            case P_ID::SYMBOL:
+            case Pid::SYMBOL:
                   return QVariant::fromValue(_symId);
-            case P_ID::PAUSE:
+            case Pid::PAUSE:
                   return _pause;
             default:
                   return Element::getProperty(propertyId);
@@ -160,14 +159,14 @@ QVariant Breath::getProperty(P_ID propertyId) const
 //   setProperty
 //---------------------------------------------------------
 
-bool Breath::setProperty(P_ID propertyId, const QVariant& v)
+bool Breath::setProperty(Pid propertyId, const QVariant& v)
       {
       switch (propertyId) {
-            case P_ID::SYMBOL:
+            case Pid::SYMBOL:
                   setSymId(v.value<SymId>());
                   break;
 
-            case P_ID::PAUSE:
+            case Pid::PAUSE:
                   setPause(v.toDouble());
                   break;
             default:
@@ -184,10 +183,10 @@ bool Breath::setProperty(P_ID propertyId, const QVariant& v)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant Breath::propertyDefault(P_ID id) const
+QVariant Breath::propertyDefault(Pid id) const
       {
       switch(id) {
-            case P_ID::PAUSE:
+            case Pid::PAUSE:
                   return 0.0;
             default:
                   return Element::propertyDefault(id);

@@ -815,13 +815,29 @@ bool Score::isSubdivided(ChordRest* chord, int swingUnit)
 //   renderTremolo
 //---------------------------------------------------------
 
-void renderTremolo(Chord *chord, QList<NoteEventList> & ell)
+void renderTremolo(Chord* chord, QList<NoteEventList>& ell)
       {
       Segment* seg = chord->segment();
       Tremolo* tremolo = chord->tremolo();
       int notes = chord->notes().size();
-      //int n = 1 << tremolo->lines();
-      //int l = 1000 / n;
+
+      // check if tremolo was rendered before for drum staff
+      if (chord->staff() && chord->staff()->isDrumStaff(chord->tick())) {
+            const Drumset* ds = chord->staff()->part()->instrument(chord->tick())->drumset();
+            if (ds) {
+                  for (Note* n : chord->notes()) {
+                        DrumInstrumentVariant div = ds->findVariant(n->pitch(), chord->articulations(), chord->tremolo());
+                        if (div.pitch != INVALID_PITCH && div.tremolo == tremolo->tremoloType())
+                              return; // already rendered
+                        }
+                  }
+            }
+
+      // we cannot render buzz roll with MIDI events only
+      if (tremolo->tremoloType() == TremoloType::BUZZ_ROLL)
+            return;
+
+      // render tremolo with multiple events
       if (chord->tremoloChordType() == TremoloChordType::TremoloFirstNote) {
             int t = MScore::division / (1 << (tremolo->lines() + chord->durationType().hooks()));
             SegmentType st = SegmentType::ChordRest;
@@ -1522,16 +1538,17 @@ static QList<NoteEventList> renderChord(Chord* chord, int gateTime, int ontime, 
             }
       else
             renderChordArticulation(chord, ell, gateTime);
+
       //
       //    apply gateTime
       //
       for (int i = 0; i < notes; ++i) {
             NoteEventList* el = &ell[i];
             if (el->size() == 0 && chord->tremoloChordType() != TremoloChordType::TremoloSecondNote) {
-                  el->append(NoteEvent(0, ontime, 1000-ontime-trailtime));
+                  el->append(NoteEvent(0, ontime, 1000 - ontime - trailtime));
                   }
-            if (0==trailtime) // if trailtime is non-zero that means we have graceNotesAfter, so we don't need additional gate time.
-                for ( NoteEvent& e : ell[i])
+            if (trailtime == 0) // if trailtime is non-zero that means we have graceNotesAfter, so we don't need additional gate time.
+                for (NoteEvent& e : ell[i])
                       e.setLen(e.len() * gateTime / 100);
             }
       return ell;

@@ -82,6 +82,7 @@ class Articulation final : public Element {
       virtual int subtype() const override      { return int(_symId); }
       QString userName() const;
       const char* articulationName() const;  // type-name of articulation; used for midi rendering
+      static const char* symId2ArticulationName(SymId symId);
 
       virtual void layout() override;
 
@@ -92,12 +93,11 @@ class Articulation final : public Element {
       virtual void reset() override;
       virtual QLineF dragAnchor() const override;
 
-      virtual QVariant getProperty(P_ID propertyId) const override;
-      virtual bool setProperty(P_ID propertyId, const QVariant&) override;
-      virtual QVariant propertyDefault(P_ID) const override;
-      virtual PropertyFlags& propertyFlags(P_ID) override;
-      virtual void resetProperty(P_ID id) override;
-      StyleIdx getPropertyStyle(P_ID id) const override;
+      virtual QVariant getProperty(Pid propertyId) const override;
+      virtual bool setProperty(Pid propertyId, const QVariant&) override;
+      virtual QVariant propertyDefault(Pid) const override;
+      virtual void resetProperty(Pid id) override;
+      Sid getPropertyStyle(Pid id) const override;
 
       bool up() const                       { return _up; }
       void setUp(bool val);

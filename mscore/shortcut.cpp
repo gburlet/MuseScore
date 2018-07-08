@@ -1907,8 +1907,8 @@ Shortcut Shortcut::_sc[] = {
          QT_TRANSLATE_NOOP("action","Add lyrics"),
          0,
          Icons::Invalid_ICON,
-         Qt::WindowShortcut,
-         ShortcutFlags::A_CMD
+         Qt::WindowShortcut
+//         ,ShortcutFlags::A_CMD
          },
       {
          MsWidget::SCORE_TAB,
@@ -2113,7 +2113,7 @@ Shortcut Shortcut::_sc[] = {
          "pan",
          QT_TRANSLATE_NOOP("action","Pan Score"),
          QT_TRANSLATE_NOOP("action","Toggle 'Pan Score'"),
-         QT_TRANSLATE_NOOP("action","Pan score during playback"),
+         QT_TRANSLATE_NOOP("action","Pan score automatically"),
          Icons::pan_ICON,
          Qt::WindowShortcut,
          ShortcutFlags::A_SCORE | ShortcutFlags::A_CHECKABLE | ShortcutFlags::A_CHECKED
@@ -3873,6 +3873,16 @@ void Shortcut::retranslate()
       for (const Shortcut& i : _sc) {
             if (i._action) {
                   i.translateAction(i._action);
+                  }
+            }
+      }
+
+void Shortcut::refreshIcons()
+      {
+      foreach (Shortcut* s, _shortcuts) {
+            QAction* a = s->action();
+            if (a && s->icon() != Icons::Invalid_ICON) {
+                  a->setIcon(*icons[int(s->icon())]);
                   }
             }
       }

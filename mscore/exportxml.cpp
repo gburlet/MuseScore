@@ -354,7 +354,11 @@ static QString addPositioningAttributes(Element const* const el, bool isSpanStar
       float relativeY = 0;
       float spatium = el->spatium();
 
-      if (SLine const* const span = dynamic_cast<SLine const* const>(el)) {
+      const SLine* span = nullptr;
+      if (el->isSLine())
+            span = static_cast<const SLine*>(el);
+
+      if (span && !span->spannerSegments().isEmpty()) {
             if (isSpanStart) {
                   const auto seg = span->spannerSegments().first();
                   const auto userOff = seg->userOff();
@@ -1179,12 +1183,12 @@ static void defaults(XmlWriter& xml, Score* s, double& millimeters, const int& t
 
       // font defaults
       // as MuseScore supports dozens of different styles, while MusicXML only has defaults
-      // for music (TODO), words and lyrics, use SubStyle STAFF (typically used for words)
+      // for music (TODO), words and lyrics, use SubStyleId STAFF (typically used for words)
       // and LYRIC1 to get MusicXML defaults
 
       // TODO xml.tagE("music-font font-family=\"TBD\" font-size=\"TBD\"");
-      xml.tagE(QString("word-font font-family=\"%1\" font-size=\"%2\"").arg(s->styleSt(StyleIdx::staffTextFontFace)).arg(s->styleD(StyleIdx::staffTextFontSize)));
-      xml.tagE(QString("lyric-font font-family=\"%1\" font-size=\"%2\"").arg(s->styleSt(StyleIdx::lyricsOddFontFace)).arg(s->styleD(StyleIdx::lyricsOddFontSize)));
+      xml.tagE(QString("word-font font-family=\"%1\" font-size=\"%2\"").arg(s->styleSt(Sid::staffTextFontFace)).arg(s->styleD(Sid::staffTextFontSize)));
+      xml.tagE(QString("lyric-font font-family=\"%1\" font-size=\"%2\"").arg(s->styleSt(Sid::lyricsOddFontFace)).arg(s->styleD(Sid::lyricsOddFontSize)));
       xml.etag();
       }
 
@@ -1195,10 +1199,10 @@ static void defaults(XmlWriter& xml, Score* s, double& millimeters, const int& t
 
 static void creditWords(XmlWriter& xml, Score* s, double x, double y, QString just, QString val, const QList<TextFragment>& words)
       {
-      const QString mtf = s->styleSt(StyleIdx::MusicalTextFont);
+      const QString mtf = s->styleSt(Sid::MusicalTextFont);
       CharFormat defFmt;
-      defFmt.setFontFamily(s->styleSt(StyleIdx::staffTextFontFace));
-      defFmt.setFontSize(s->styleD(StyleIdx::staffTextFontSize));
+      defFmt.setFontFamily(s->styleSt(Sid::staffTextFontFace));
+      defFmt.setFontSize(s->styleD(Sid::staffTextFontSize));
 
       // export formatted
       xml.stag("credit page=\"1\"");
@@ -1239,12 +1243,12 @@ void ExportMusicXml::credits(XmlWriter& xml)
       QString rights = _score->metaTag("copyright");
 
       // determine page formatting
-      const double h  = getTenthsFromInches(_score->styleD(StyleIdx::pageHeight));
-      const double w  = getTenthsFromInches(_score->styleD(StyleIdx::pageWidth));
-      const double lm = getTenthsFromInches(_score->styleD(StyleIdx::pageOddLeftMargin));
-      const double rm = getTenthsFromInches(_score->styleD(StyleIdx::pagePrintableWidth) - _score->styleD(StyleIdx::pageOddLeftMargin));
+      const double h  = getTenthsFromInches(_score->styleD(Sid::pageHeight));
+      const double w  = getTenthsFromInches(_score->styleD(Sid::pageWidth));
+      const double lm = getTenthsFromInches(_score->styleD(Sid::pageOddLeftMargin));
+      const double rm = getTenthsFromInches(_score->styleD(Sid::pagePrintableWidth) - _score->styleD(Sid::pageOddLeftMargin));
       //const double tm = getTenthsFromInches(pf->oddTopMargin());
-      const double bm = getTenthsFromInches(_score->styleD(StyleIdx::pageOddBottomMargin));
+      const double bm = getTenthsFromInches(_score->styleD(Sid::pageOddBottomMargin));
       //qDebug("page h=%g w=%g lm=%g rm=%g tm=%g bm=%g", h, w, lm, rm, tm, bm);
 
       // write the credits
@@ -1301,8 +1305,8 @@ void ExportMusicXml::credits(XmlWriter& xml)
             // put copyright at the bottom center of the page
             // note: as the copyright metatag contains plain text, special XML characters must be escaped
             TextFragment f(XmlWriter::xmlString(rights));
-            f.changeFormat(FormatId::FontFamily, _score->styleSt(StyleIdx::footerFontFace));
-            f.changeFormat(FormatId::FontSize, _score->styleD(StyleIdx::footerFontSize));
+            f.changeFormat(FormatId::FontFamily, _score->styleSt(Sid::footerFontFace));
+            f.changeFormat(FormatId::FontSize, _score->styleD(Sid::footerFontSize));
             QList<TextFragment> list;
             list.append(f);
             creditWords(xml, _score, w / 2, bm, "center", "bottom", list);
@@ -1786,9 +1790,9 @@ static void tupletStartStop(ChordRest* cr, Notations& notations, XmlWriter& xml)
             QString tupletTag = "tuplet type=\"start\"";
             tupletTag += " bracket=";
             tupletTag += t->hasBracket() ? "\"yes\"" : "\"no\"";
-            if (t->numberType() == Tuplet::NumberType::SHOW_RELATION)
+            if (t->numberType() == TupletNumberType::SHOW_RELATION)
                   tupletTag += " show-number=\"both\"";
-            if (t->numberType() == Tuplet::NumberType::NO_TEXT)
+            if (t->numberType() == TupletNumberType::NO_TEXT)
                   tupletTag += " show-number=\"none\"";
             xml.tagE(tupletTag);
             }
@@ -2469,11 +2473,11 @@ static void writeFingering(XmlWriter& xml, Notations& notations, Technical& tech
                   notations.tag(xml);
                   technical.tag(xml);
                   QString t = MScoreTextToMXML::toPlainText(f->xmlText());
-                  if (f->subStyle() == SubStyle::RH_GUITAR_FINGERING)
+                  if (f->subStyleId() == SubStyleId::RH_GUITAR_FINGERING)
                         xml.tag("pluck", t);
-                  else if (f->subStyle() == SubStyle::LH_GUITAR_FINGERING)
+                  else if (f->subStyleId() == SubStyleId::LH_GUITAR_FINGERING)
                         xml.tag("fingering", t);
-                  else if (f->subStyle() == SubStyle::FINGERING) {
+                  else if (f->subStyleId() == SubStyleId::FINGERING) {
                         // for generic fingering, try to detect plucking
                         // (backwards compatibility with MuseScore 1.x)
                         // p, i, m, a, c represent the plucking finger
@@ -2482,7 +2486,7 @@ static void writeFingering(XmlWriter& xml, Notations& notations, Technical& tech
                         else
                               xml.tag("fingering", t);
                         }
-                  else if (f->subStyle() == SubStyle::STRING_NUMBER) {
+                  else if (f->subStyleId() == SubStyleId::STRING_NUMBER) {
                         bool ok;
                         int i = t.toInt(&ok);
                         if (ok) {
@@ -2669,7 +2673,7 @@ static QString notePosition(const ExportMusicXml* const expMxml, const Note* con
       QString res;
 
       if (preferences.getBool(PREF_EXPORT_MUSICXML_EXPORTLAYOUT)) {
-            const double pageHeight  = expMxml->getTenthsFromInches(expMxml->score()->styleD(StyleIdx::pageHeight));
+            const double pageHeight  = expMxml->getTenthsFromInches(expMxml->score()->styleD(Sid::pageHeight));
 
             const auto chord = note->chord();
 
@@ -3054,9 +3058,9 @@ static void directionTag(XmlWriter& xml, Attributes& attr, Element const* const 
              */
 
             if (pel && pel->type() == ElementType::SYSTEM) {
+                  /*
                   const System* sys = static_cast<const System*>(pel);
                   QRectF bb = sys->staff(el->staffIdx())->bbox();
-                  /*
                   qDebug("directionTag()  syst=%p sys x=%g y=%g cpx=%g cpy=%g",
                          sys, sys->pos().x(),  sys->pos().y(),
                          sys->pagePos().x(),
@@ -3073,15 +3077,15 @@ static void directionTag(XmlWriter& xml, Attributes& attr, Element const* const 
                         // for the line type elements the reference point is vertically centered
                         // actual position info is in the segments
                         // compare the segment's canvas ypos with the staff's center height
-                        if (seg->pagePos().y() < sys->pagePos().y() + bb.y() + bb.height() / 2)
+                        // if (seg->pagePos().y() < sys->pagePos().y() + bb.y() + bb.height() / 2)
+                        if (el->placement() == Placement::ABOVE)
                               tagname += " placement=\"above\"";
                         else
                               tagname += " placement=\"below\"";
                         }
                   else if (el->isDynamic()) {
                         tagname += " placement=\"";
-                        tagname += el->placement() == Placement::ABOVE
-                              ? "above" : "below";
+                        tagname += el->placement() == Placement::ABOVE ? "above" : "below";
                         tagname += "\"";
                         }
                   else {
@@ -3090,7 +3094,8 @@ static void directionTag(XmlWriter& xml, Attributes& attr, Element const* const 
                                el->y(), el->height(),
                                bb.y(), bb.height());
                          */
-                        if (el->y() + el->height() / 2 < /*bb.y() +*/ bb.height() / 2)
+                        // if (el->y() + el->height() / 2 < /*bb.y() +*/ bb.height() / 2)
+                        if (el->placement() == Placement::ABOVE)
                               tagname += " placement=\"above\"";
                         else
                               tagname += " placement=\"below\"";
@@ -3292,10 +3297,10 @@ static void wordsMetrome(XmlWriter& xml, Score* s, TextBase const* const text)
       QList<TextFragment>       wordsRight; // words right of metronome
 
       // set the default words format
-      const QString mtf = s->styleSt(StyleIdx::MusicalTextFont);
+      const QString mtf = s->styleSt(Sid::MusicalTextFont);
       CharFormat defFmt;
-      defFmt.setFontFamily(s->styleSt(StyleIdx::staffTextFontFace));
-      defFmt.setFontSize(s->styleD(StyleIdx::staffTextFontSize));
+      defFmt.setFontFamily(s->styleSt(Sid::staffTextFontFace));
+      defFmt.setFontSize(s->styleD(Sid::staffTextFontSize));
 
       if (findMetronome(list, wordsLeft, hasParen, metroLeft, metroRight, wordsRight)) {
             if (wordsLeft.size() > 0) {
@@ -3357,7 +3362,7 @@ void ExportMusicXml::tempoText(TempoText const* const text, int staff)
       qDebug("ExportMusicXml::tempoText(TempoText='%s')", qPrintable(text->xmlText()));
       */
       attr.doAttr(xml, false);
-      xml.stag(QString("direction placement=\"%1\"").arg((text->parent()->y()-text->y() < 0.0) ? "below" : "above"));
+      xml.stag(QString("direction placement=\"%1\"").arg((text->placement() ==Placement::BELOW ) ? "below" : "above"));
       wordsMetrome(xml, _score, text);
       /*
       int offs = text->mxmlOff();
@@ -3412,10 +3417,10 @@ void ExportMusicXml::rehearsal(RehearsalMark const* const rmk, int staff)
       attr += addPositioningAttributes(rmk);
       if (!rmk->hasFrame()) attr = " enclosure=\"none\"";
       // set the default words format
-      const QString mtf = _score->styleSt(StyleIdx::MusicalTextFont);
+      const QString mtf = _score->styleSt(Sid::MusicalTextFont);
       CharFormat defFmt;
-      defFmt.setFontFamily(_score->styleSt(StyleIdx::staffTextFontFace));
-      defFmt.setFontSize(_score->styleD(StyleIdx::staffTextFontSize));
+      defFmt.setFontFamily(_score->styleSt(Sid::staffTextFontFace));
+      defFmt.setFontSize(_score->styleD(Sid::staffTextFontSize));
       // write formatted
       MScoreTextToMXML mttm("rehearsal", attr, defFmt, mtf);
       mttm.writeTextFragments(rmk->fragmentList(), xml);
@@ -3790,10 +3795,10 @@ void ExportMusicXml::lyrics(const std::vector<Lyrics*>* ll, const int trk)
                         xml.tag("syllabic", s);
                         QString attr; // TODO TBD
                         // set the default words format
-                        const QString mtf       = _score->styleSt(StyleIdx::MusicalTextFont);
+                        const QString mtf       = _score->styleSt(Sid::MusicalTextFont);
                         CharFormat defFmt;
-                        defFmt.setFontFamily(_score->styleSt(StyleIdx::lyricsEvenFontFace));
-                        defFmt.setFontSize(_score->styleD(StyleIdx::lyricsOddFontSize));
+                        defFmt.setFontFamily(_score->styleSt(Sid::lyricsEvenFontFace));
+                        defFmt.setFontSize(_score->styleD(Sid::lyricsOddFontSize));
                         // write formatted
                         MScoreTextToMXML mttm("text", attr, defFmt, mtf);
                         mttm.writeTextFragments(l->fragmentList(), xml);
@@ -3877,7 +3882,8 @@ static void directionJump(XmlWriter& xml, const Jump* const jp)
       else
             qDebug("jump type=%d not implemented", int(jtp));
       if (sound != "") {
-            xml.stag("direction placement=\"above\"");
+//            xml.stag("direction placement=\"above\"");
+            xml.stag(QString("direction placement=\"%1\"").arg((jp->placement() ==Placement::BELOW ) ? "below" : "above"));
             xml.stag("direction-type");
             QString positioning = "";
             positioning += addPositioningAttributes(jp);
@@ -3932,7 +3938,8 @@ static void directionMarker(XmlWriter& xml, const Marker* const m)
       else
             qDebug("marker type=%d not implemented", int(mtp));
       if (sound != "") {
-            xml.stag("direction placement=\"above\"");
+//            xml.stag("direction placement=\"above\"");
+            xml.stag(QString("direction placement=\"%1\"").arg((m->placement() ==Placement::BELOW ) ? "below" : "above"));
             xml.stag("direction-type");
             QString positioning = "";
             positioning += addPositioningAttributes(m);
@@ -4659,11 +4666,11 @@ void ExportMusicXml::print(Measure* m, int idx, int staffCount, int staves)
 
             if (doLayout) {
                   xml.stag(QString("print%1").arg(newThing));
-                  const double pageWidth  = getTenthsFromInches(score()->styleD(StyleIdx::pageWidth));
-                  const double lm = getTenthsFromInches(score()->styleD(StyleIdx::pageOddLeftMargin));
-                  const double rm = getTenthsFromInches(score()->styleD(StyleIdx::pageWidth)
-                                                        - score()->styleD(StyleIdx::pagePrintableWidth) - score()->styleD(StyleIdx::pageOddLeftMargin));
-                  const double tm = getTenthsFromInches(score()->styleD(StyleIdx::pageOddTopMargin));
+                  const double pageWidth  = getTenthsFromInches(score()->styleD(Sid::pageWidth));
+                  const double lm = getTenthsFromInches(score()->styleD(Sid::pageOddLeftMargin));
+                  const double rm = getTenthsFromInches(score()->styleD(Sid::pageWidth)
+                                                        - score()->styleD(Sid::pagePrintableWidth) - score()->styleD(Sid::pageOddLeftMargin));
+                  const double tm = getTenthsFromInches(score()->styleD(Sid::pageOddTopMargin));
 
                   // System Layout
 
@@ -5148,10 +5155,10 @@ void ExportMusicXml::write(QIODevice* dev)
       // losing the transposition information
       // if necessary, switch concert pitch mode off
       // before export and restore it after export
-      bool concertPitch = score()->styleB(StyleIdx::concertPitch);
+      bool concertPitch = score()->styleB(Sid::concertPitch);
       if (concertPitch) {
             score()->startCmd();
-            score()->undo(new ChangeStyleVal(score(), StyleIdx::concertPitch, false));
+            score()->undo(new ChangeStyleVal(score(), Sid::concertPitch, false));
             score()->doLayout();    // this is only allowed in a cmd context to not corrupt the undo/redo stack
             }
 
@@ -5477,8 +5484,8 @@ void ExportMusicXml::harmony(Harmony const* const h, FretDiagram const* const fd
 
             if (!h->xmlKind().isEmpty()) {
                   QString s = "kind";
-                  QString kindText = h->xmlText();
-                  if (h->xmlText() != "")
+                  QString kindText = h->musicXmlText();
+                  if (h->musicXmlText() != "")
                         s += " text=\"" + kindText + "\"";
                   if (h->xmlSymbols() == "yes")
                         s += " use-symbols=\"yes\"";

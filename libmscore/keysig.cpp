@@ -17,6 +17,7 @@
 #include "measure.h"
 #include "segment.h"
 #include "score.h"
+#include "system.h"
 #include "undo.h"
 #include "xml.h"
 
@@ -46,9 +47,8 @@ const char* keyNames[] = {
 //---------------------------------------------------------
 
 KeySig::KeySig(Score* s)
-  : Element(s)
+  : Element(s, ElementFlag::ON_STAFF)
       {
-      setFlags(ElementFlag::SELECTABLE | ElementFlag::ON_STAFF);
       _showCourtesy = true;
       _hideNaturals = false;
       }
@@ -136,11 +136,12 @@ void KeySig::layout()
       // If we're not force hiding naturals (Continuous panel), use score style settings
       if (!_hideNaturals)
             naturalsOn = (prevMeasure && !prevMeasure->sectionBreak()
-               && (score()->styleI(StyleIdx::keySigNaturals) != int(KeySigNatural::NONE))) || (t1 == 0);
+               && (score()->styleI(Sid::keySigNaturals) != int(KeySigNatural::NONE))) || (t1 == 0);
 
 
       // Don't repeat naturals if shown in courtesy
-      if (prevMeasure && prevMeasure->findSegment(SegmentType::KeySigAnnounce, segment()->tick())
+      if (measure() && measure()->system() && measure() == measure()->system()->firstMeasure()
+          && prevMeasure && prevMeasure->findSegment(SegmentType::KeySigAnnounce, segment()->tick())
           && !segment()->isKeySigAnnounceType())
             naturalsOn = false;
       if (track() == -1)
@@ -179,7 +180,7 @@ void KeySig::layout()
 
       bool prefixNaturals =
             naturalsOn
-            && (score()->styleI(StyleIdx::keySigNaturals) == int(KeySigNatural::BEFORE) || t1 * int(t2) < 0);
+            && (score()->styleI(Sid::keySigNaturals) == int(KeySigNatural::BEFORE) || t1 * int(t2) < 0);
 
       // naturals should go AFTER accidentals if they should not go before!
       bool suffixNaturals = naturalsOn && !prefixNaturals;
@@ -507,17 +508,17 @@ int KeySig::tick() const
 
 void KeySig::undoSetShowCourtesy(bool v)
       {
-      undoChangeProperty(P_ID::SHOW_COURTESY, v);
+      undoChangeProperty(Pid::SHOW_COURTESY, v);
       }
 
 //---------------------------------------------------------
 //   getProperty
 //---------------------------------------------------------
 
-QVariant KeySig::getProperty(P_ID propertyId) const
+QVariant KeySig::getProperty(Pid propertyId) const
       {
       switch (propertyId) {
-            case P_ID::SHOW_COURTESY: return int(showCourtesy());
+            case Pid::SHOW_COURTESY: return int(showCourtesy());
             default:
                   return Element::getProperty(propertyId);
             }
@@ -527,10 +528,10 @@ QVariant KeySig::getProperty(P_ID propertyId) const
 //   setProperty
 //---------------------------------------------------------
 
-bool KeySig::setProperty(P_ID propertyId, const QVariant& v)
+bool KeySig::setProperty(Pid propertyId, const QVariant& v)
       {
       switch (propertyId) {
-            case P_ID::SHOW_COURTESY:
+            case Pid::SHOW_COURTESY:
                   if (generated())
                         return false;
                   setShowCourtesy(v.toBool());
@@ -549,10 +550,10 @@ bool KeySig::setProperty(P_ID propertyId, const QVariant& v)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant KeySig::propertyDefault(P_ID id) const
+QVariant KeySig::propertyDefault(Pid id) const
       {
       switch (id) {
-            case P_ID::SHOW_COURTESY:     return true;
+            case Pid::SHOW_COURTESY:     return true;
             default:
                   return Element::propertyDefault(id);
             }

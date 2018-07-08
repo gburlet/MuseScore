@@ -46,6 +46,7 @@
 #include "ui_inspector_bracket.h"
 #include "ui_inspector_iname.h"
 #include "ui_inspector_fermata.h"
+#include "ui_inspector_stem.h"
 
 namespace Ms {
 
@@ -188,7 +189,6 @@ class InspectorRest : public InspectorElementBase {
 //   InspectorClef
 //---------------------------------------------------------
 
-
 class InspectorClef : public InspectorElementBase {
       Q_OBJECT
 
@@ -202,6 +202,21 @@ class InspectorClef : public InspectorElementBase {
    public:
       InspectorClef(QWidget* parent);
       virtual void setElement() override;
+      };
+
+//---------------------------------------------------------
+//   InspectorStem
+//---------------------------------------------------------
+
+
+class InspectorStem : public InspectorElementBase {
+      Q_OBJECT
+
+      Ui::InspectorStem s;
+
+   public:
+      InspectorStem(QWidget* parent);
+//      virtual void setElement() override;
       };
 
 //---------------------------------------------------------
@@ -348,6 +363,7 @@ class Inspector : public QDockWidget {
       bool _inspectorEdit;    // set to true when an edit originates from
                               // within the inspector itself
       Element* oe;
+      bool oSameTypes;
 
    public slots:
       void update();

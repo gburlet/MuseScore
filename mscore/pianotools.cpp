@@ -191,13 +191,25 @@ void HPiano::changeSelection(Selection selection)
             key->setHighlighted(false);
             key->setSelected(false);
             }
-      for (Note* n : selection.uniqueNotes()) {
-            keys[n->pitch() - _firstKey]->setSelected(true);
+      for (Note* n : selection.noteList()) {
+            if (n->epitch() >= _firstKey && n->epitch() <= _lastKey)
+                  keys[n->epitch() - _firstKey]->setSelected(true);
             for (Note* other : n->chord()->notes())
-                  keys[other->pitch() - _firstKey]->setHighlighted(true);
+                  if (other->epitch() >= _firstKey && other->epitch() <= _lastKey)
+                        keys[other->epitch() - _firstKey]->setHighlighted(true);
             }
       for (PianoKeyItem* key : keys)
             key->update();
+      }
+
+// used when currentScore() is NULL; same as above except the for loop
+void HPiano::clearSelection()
+      {
+      for (PianoKeyItem* key : keys) {
+            key->setHighlighted(false);
+            key->setSelected(false);
+            key->update();
+            }
       }
 
 //---------------------------------------------------------
@@ -521,5 +533,9 @@ void PianoTools::changeSelection(Selection selection)
       {
       _piano->changeSelection(selection);
       }
-}
 
+void PianoTools::clearSelection()
+      {
+      _piano->clearSelection();
+      }
+}

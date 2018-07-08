@@ -397,7 +397,8 @@ void Palette::mouseMoveEvent(QMouseEvent* ev)
 
 static void applyDrop(Score* score, ScoreView* viewer, Element* target, Element* e, QPointF pt = QPointF())
       {
-      EditData dropData(viewer);
+      EditData dropData = viewer->getEditData();
+//      EditData dropData;
       dropData.pos        = pt.isNull() ? target->pagePos() : pt;
       dropData.dragOffset = QPointF();
       dropData.modifiers  = 0;
@@ -407,6 +408,7 @@ static void applyDrop(Score* score, ScoreView* viewer, Element* target, Element*
             // use same code path as drag&drop
 
             QByteArray a = e->mimeData(QPointF());
+
             XmlReader e(a);
             Fraction duration;  // dummy
             QPointF dragOffset;
@@ -419,6 +421,7 @@ static void applyDrop(Score* score, ScoreView* viewer, Element* target, Element*
             Element* el = target->drop(dropData);
             if (el)
                   score->select(el, SelectType::SINGLE, 0);
+            dropData.element = 0;
             }
       }
 
@@ -444,8 +447,7 @@ void Palette::applyPaletteElement(PaletteCell* cell)
       ScoreView* viewer = mscore->currentScoreView();
       if (viewer->mscoreState() != STATE_EDIT
          && viewer->mscoreState() != STATE_LYRICS_EDIT
-         && viewer->mscoreState() != STATE_HARMONY_FIGBASS_EDIT
-         && viewer->mscoreState() != STATE_TEXT_EDIT) { // Already in startCmd in this case
+         && viewer->mscoreState() != STATE_HARMONY_FIGBASS_EDIT) { // Already in startCmd in this case
             score->startCmd();
             }
       if (sel.isList()) {
@@ -480,10 +482,14 @@ void Palette::applyPaletteElement(PaletteCell* cell)
                   else
                         qDebug("nowhere to place drum note");
                   }
+            else if (element->isLayoutBreak()) {
+                  LayoutBreak* breakElement = toLayoutBreak(element);
+                  score->cmdToggleLayoutBreak(breakElement->layoutBreakType());
+                  }
             else if (element->isSlur() && addSingle) {
                   viewer->addSlur();
                   }
-            else if (element->isSLine() && element->type() != ElementType::GLISSANDO && addSingle) {
+            else if (element->isSLine() && !element->isGlissando() && addSingle) {
                   Segment* startSegment = cr1->segment();
                   Segment* endSegment = cr2->segment();
                   if (element->type() == ElementType::PEDAL && cr2 != cr1)
@@ -492,6 +498,7 @@ void Palette::applyPaletteElement(PaletteCell* cell)
                   int idx = cr1->staffIdx();
 
                   QByteArray a = element->mimeData(QPointF());
+// printf("<<%s>>\n", a.data());
                   XmlReader e(a);
                   Fraction duration;  // dummy
                   QPointF dragOffset;
@@ -584,7 +591,7 @@ void Palette::applyPaletteElement(PaletteCell* cell)
                                           {
                                           KeySig* okeysig = new KeySig(score);
                                           okeysig->setKeySigEvent(staff->keySigEvent(tick1));
-                                          if (!score->styleB(StyleIdx::concertPitch) && !okeysig->isCustom() && !okeysig->isAtonal()) {
+                                          if (!score->styleB(Sid::concertPitch) && !okeysig->isCustom() && !okeysig->isAtonal()) {
                                                 Interval v = staff->part()->instrument(tick1)->transpose();
                                                 if (!v.isZero()) {
                                                       Key k = okeysig->key();
@@ -668,16 +675,16 @@ void Palette::applyPaletteElement(PaletteCell* cell)
             }
       else
             qDebug("unknown selection state");
+
       if (viewer->mscoreState() != STATE_EDIT
          && viewer->mscoreState() != STATE_LYRICS_EDIT
-         && viewer->mscoreState() != STATE_HARMONY_FIGBASS_EDIT
-         && viewer->mscoreState() != STATE_TEXT_EDIT) { //Already in startCmd mode in this case
+         && viewer->mscoreState() != STATE_HARMONY_FIGBASS_EDIT) { //Already in startCmd mode in this case
             score->endCmd();
             if (viewer->mscoreState() == STATE_NOTE_ENTRY_STAFF_DRUM)
                   viewer->moveCursor();
             }
       viewer->setDropTarget(0);
-      mscore->endCmd();
+//      mscore->endCmd();
       }
 
 //---------------------------------------------------------
@@ -918,7 +925,6 @@ PaletteCell* Palette::add(int idx, Element* s, const QString& name, QString tag,
       if (s) {
             s->setPos(0.0, 0.0);
             s->setUserOff(QPointF());
-            s->setReadPos(QPointF());
             }
 
       PaletteCell* cell = new PaletteCell;
@@ -1012,7 +1018,7 @@ void Palette::paintEvent(QPaintEvent* /*event*/)
 
       // QPen pen(palette().color(QPalette::Normal, QPalette::Text));
       QPen pen(Qt::black);
-      pen.setWidthF(MScore::defaultStyle().value(StyleIdx::staffLineWidth).toDouble() * PALETTE_SPATIUM * extraMag);
+      pen.setWidthF(MScore::defaultStyle().value(Sid::staffLineWidth).toDouble() * PALETTE_SPATIUM * extraMag);
 
       for (int idx = 0; idx < ccp()->size(); ++idx) {
             int yoffset  = gscore->spatium() * _yOffset;

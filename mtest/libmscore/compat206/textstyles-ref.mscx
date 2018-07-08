@@ -18,13 +18,16 @@
       <staffLowerBorder>4</staffLowerBorder>
       <minSystemDistance>9</minSystemDistance>
       <lyricsMinBottomDistance>4</lyricsMinBottomDistance>
+      <lyricsOddFontFace>MuseJazz Text</lyricsOddFontFace>
       <repeatBarTips>1</repeatBarTips>
       <clefLeftMargin>0.64</clefLeftMargin>
       <clefKeyRightMargin>1.75</clefKeyRightMargin>
       <stemWidth>0.16</stemWidth>
       <barNoteDistance>1.2</barNoteDistance>
       <lastSystemFillLimit>0.25</lastSystemFillLimit>
+      <hairpinFontFace>MuseJazz Text</hairpinFontFace>
       <pedalPosBelow>0</pedalPosBelow>
+      <pedalFontFace>MuseJazz Text</pedalFontFace>
       <trillPosAbove>0</trillPosAbove>
       <measureNumberSystem>0</measureNumberSystem>
       <chordStyle>jazz</chordStyle>
@@ -35,6 +38,13 @@
       <oddFooterC>$C$p</oddFooterC>
       <oddFooterR></oddFooterR>
       <voltaY>-6</voltaY>
+      <voltaFontFace>MuseJazz Text</voltaFontFace>
+      <voltaFontSize>8</voltaFontSize>
+      <voltaFontBold>0</voltaFontBold>
+      <ottavaFontFace>MuseJazz Text</ottavaFontFace>
+      <ottavaFontSize>10</ottavaFontSize>
+      <ottavaFontItalic>1</ottavaFontItalic>
+      <tupletFontFace>MuseJazz Text</tupletFontFace>
       <titleFontFace>MuseJazz Text</titleFontFace>
       <titleFontSize>28</titleFontSize>
       <titleFontSpatiumDependent>1</titleFontSpatiumDependent>
@@ -43,8 +53,6 @@
       <composerFontFace>MuseJazz Text</composerFontFace>
       <composerFontSpatiumDependent>1</composerFontSpatiumDependent>
       <lyricistFontFace>MuseJazz Text</lyricistFontFace>
-      <lyricsOddFontFace>MuseJazz Text</lyricsOddFontFace>
-      <lyricsEvenFontFace>MuseJazz Text</lyricsEvenFontFace>
       <fingeringFontFace>MuseJazz Text</fingeringFontFace>
       <fingeringFramePadding>0</fingeringFramePadding>
       <fingeringFrameWidth>0</fingeringFrameWidth>
@@ -65,17 +73,17 @@
       <expressionFontSize>12</expressionFontSize>
       <tempoFontFace>MuseJazz Text</tempoFontFace>
       <tempoFontBold>0</tempoFontBold>
+      <tempoPosAbove>-4</tempoPosAbove>
       <metronomeFontFace>MuseJazz Text</metronomeFontFace>
       <measureNumberFontFace>MuseJazz Text</measureNumberFontFace>
       <translatorFontFace>MuseJazz Text</translatorFontFace>
-      <tupletFontFace>MuseJazz Text</tupletFontFace>
       <systemFontFace>MuseJazz Text</systemFontFace>
       <systemFontSize>11</systemFontSize>
       <systemOffset x="0" y="-2"/>
       <staffFontFace>MuseJazz Text</staffFontFace>
       <staffFontSize>11</staffFontSize>
       <staffAlign>left,top</staffAlign>
-      <staffOffset x="0" y="5.5"/>
+      <staffTextPosAbove>5.5</staffTextPosAbove>
       <chordSymbolFontFace>MuseJazz Text</chordSymbolFontFace>
       <chordSymbolFontSize>15</chordSymbolFontSize>
       <rehearsalMarkFontFace>MuseJazz Text</rehearsalMarkFontFace>
@@ -83,17 +91,14 @@
       <rehearsalMarkAlign>right,baseline</rehearsalMarkAlign>
       <rehearsalMarkFramePadding>0.2</rehearsalMarkFramePadding>
       <repeatLeftFontFace>MuseJazz Text</repeatLeftFontFace>
+      <repeatLeftFontSize>12</repeatLeftFontSize>
+      <repeatLeftAlign>right,baseline</repeatLeftAlign>
       <repeatRightFontFace>MuseJazz Text</repeatRightFontFace>
       <repeatRightAlign>right,top</repeatRightAlign>
       <frameFontFace>MuseJazz Text</frameFontFace>
       <textLineFontFace>MuseJazz Text</textLineFontFace>
       <textLineFontSize>10</textLineFontSize>
       <glissandoFontFace>MuseJazz Text</glissandoFontFace>
-      <ottavaFontFace>MuseJazz Text</ottavaFontFace>
-      <ottavaFontSize>10</ottavaFontSize>
-      <ottavaFontItalic>1</ottavaFontItalic>
-      <pedalFontFace>MuseJazz Text</pedalFontFace>
-      <hairpinFontFace>MuseJazz Text</hairpinFontFace>
       <bendFontFace>MuseJazz Text</bendFontFace>
       <headerFontFace>MuseJazz Text</headerFontFace>
       <footerFontFace>MuseJazz Text</footerFontFace>
@@ -199,14 +204,10 @@
         <StaffText>
           <text>staff</text>
           </StaffText>
-        <StaffText>
-          <style>System</style>
-          <text></text>
-          </StaffText>
         <Tempo>
           <tempo>1.33333</tempo>
           <followText>1</followText>
-          <text><sym>unicodeNoteQuarterUp</sym> = 80</text>
+          <text><sym>metNoteQuarterUp</sym> = 80</text>
           </Tempo>
         <Rest>
           <durationType>measure</durationType>
@@ -327,7 +328,6 @@
       <Measure number="11">
         <StaffText>
           <style>Expression</style>
-          <offset x="0" y="5.5"/>
           <text>technique</text>
           </StaffText>
         <Rest>
@@ -365,7 +365,6 @@
           </LayoutBreak>
         <StaffText>
           <style>Metronome</style>
-          <offset x="0" y="5.5"/>
           <text>metronome</text>
           </StaffText>
         <Rest>
@@ -422,7 +421,6 @@
         <Pedal id="2">
           <endHookType>1</endHookType>
           <beginText>&lt;sym&gt;keyboardPedalPed&lt;/sym&gt;</beginText>
-          <continueText>(&lt;sym&gt;keyboardPedalPed&lt;/sym&gt;)</continueText>
           </Pedal>
         <Chord>
           <durationType>quarter</durationType>
@@ -479,6 +477,7 @@
         <TextLine id="5">
           <endHookType>1</endHookType>
           <beginText>VII</beginText>
+          <beginTextPlace>3</beginTextPlace>
           </TextLine>
         <Rest>
           <durationType>measure</durationType>

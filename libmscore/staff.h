@@ -45,6 +45,7 @@ class BracketItem;
 
 enum class Key;
 
+#if 0
 //---------------------------------------------------------
 //   LinkedStaves
 //---------------------------------------------------------
@@ -60,6 +61,7 @@ class LinkedStaves {
       void remove(Staff*);
       bool empty() const { return _staves.empty(); }
       };
+#endif
 
 //---------------------------------------------------------
 //   SwingParameters
@@ -104,7 +106,7 @@ class Staff final : public ScoreElement {
 
       StaffTypeList _staffTypeList;
 
-      LinkedStaves* _linkedStaves { 0 };
+//      LinkedStaves* _linkedStaves { 0 };
       QMap<int,int> _channelList[VOICES];
       QMap<int,SwingParameters> _swingList;
       bool _playbackVoice[VOICES] { true, true, true, true };
@@ -140,6 +142,7 @@ class Staff final : public ScoreElement {
       void setBracketType(int idx, BracketType val);
       void setBracketSpan(int idx, int val);
       void swapBracket(int oldIdx, int newIdx);
+      void changeBracketColumn(int oldColumn, int newColumn);
       void addBracket(BracketItem*);
       const QList<BracketItem*>& brackets() const { return _brackets; }
       QList<BracketItem*>& brackets()             { return _brackets; }
@@ -233,12 +236,12 @@ class Staff final : public ScoreElement {
       int pitchOffset(int tick)        { return _pitchOffsets.pitchOffset(tick);   }
       void updateOttava();
 
-      LinkedStaves* linkedStaves() const    { return _linkedStaves; }
-      void setLinkedStaves(LinkedStaves* l) { _linkedStaves = l;    }
+//      LinkedStaves* linkedStaves() const    { return _linkedStaves; }
+//      void setLinkedStaves(LinkedStaves* l) { _linkedStaves = l;    }
       QList<Staff*> staffList() const;
-      void linkTo(Staff* staff);
-      bool isLinked(Staff* staff);
-      void unlink(Staff* staff);
+//      void linkTo(Staff* staff);
+//      bool isLinked(Staff* staff);
+//      void unlink(Staff* staff);
       bool primaryStaff() const;
 
       qreal userDist() const        { return _userDist;  }
@@ -253,9 +256,9 @@ class Staff final : public ScoreElement {
       void undoSetColor(const QColor& val);
       void insertTime(int tick, int len);
 
-      virtual QVariant getProperty(P_ID) const override;
-      virtual bool setProperty(P_ID, const QVariant&) override;
-      virtual QVariant propertyDefault(P_ID) const override;
+      virtual QVariant getProperty(Pid) const override;
+      virtual bool setProperty(Pid, const QVariant&) override;
+      virtual QVariant propertyDefault(Pid) const override;
 
       BracketType innerBracket() const;
 

@@ -84,11 +84,23 @@ struct SfzRegion {
       int octave_offset, note_offset;
       int tune, transpose;
       double pitch_keytrack;
-      int loopStart, loopEnd;
+      long long loopStart, loopEnd; // [0, 4Gb) or [0, 4294967295]
       Trigger trigger;
       LoopMode loop_mode;
       OffMode off_mode;
       std::map<int, double> gain_oncc;
+      float delay; //seconds
+      int pan;    // [-100, 100]
+      long long offset; // [0, 4Gb) or [0, 4294967295]
+      float group_volume; // [-144 to 6] (dB)
+
+      //filters
+      bool isCutoffDefined;
+      float cutoff; //[0, sampleRate / 2] Hz
+      int fil_keytrack; //[0, 1200] cents
+      int fil_keycenter; //[0, 127]
+      int fil_veltrack; //[-9600, 9600] cents
+      FilterType fil_type;
 
       void init(const QString&);
       bool isEmpty() const { return sample.isEmpty(); }
@@ -150,6 +162,16 @@ void SfzRegion::init(const QString& _path)
       use_cc         = false;
       off_mode = OffMode::FAST;
       gain_oncc.clear();
+      delay = 0.0f;
+      pan = 0;
+      offset = 0;
+      group_volume = 0.0f;
+      isCutoffDefined = false;
+      cutoff = 0;
+      fil_keytrack = 0;
+      fil_keycenter = 60;
+      fil_veltrack = 0;
+      fil_type = FilterType::lpf_2p;
       }
 
 //---------------------------------------------------------
@@ -164,7 +186,7 @@ void SfzRegion::setZone(Zone* z) const
       z->veloLo       = lovel;
       z->veloHi       = hivel;
       z->keyBase      = pitch_keycenter;
-      z->offset       = 0;
+      z->offset       = offset;
       z->volume       = pow(10.0, volume / 20.0);
       z->ampVeltrack  = amp_veltrack;
       z->ampegAttack  = ampeg_attack * 1000;
@@ -204,6 +226,16 @@ void SfzRegion::setZone(Zone* z) const
       z->loopEnd      = loopEnd;
       z->loopStart    = loopStart;
       z->gainOnCC     = gain_oncc;
+      z->delay        = delay * 1000; //convert seconds from sfz to ms for computations
+      z->pan          = pan;
+      z->group_volume = pow(10.0, group_volume / 20.0); //dB -> volume multiplier
+
+      z->isCutoffDefined = isCutoffDefined;
+      z->cutoff = cutoff;
+      z->fil_keycenter = fil_keycenter;
+      z->fil_keytrack = fil_keytrack;
+      z->fil_veltrack = fil_veltrack;
+      z->fil_type = fil_type;
       }
 
 //---------------------------------------------------------
@@ -266,7 +298,7 @@ void ZInstrument::addRegion(SfzRegion& r)
       Zone* z = new Zone;
       z->sample = readSample(r.sample, 0);
       if (z->sample) {
-            qDebug("Sample Loop - start %d, end %d, mode %d", z->sample->loopStart(), z->sample->loopEnd(), z->sample->loopMode());
+            //qDebug("Sample Loop - start %ll, end %ll, mode %d", z->sample->loopStart(), z->sample->loopEnd(), z->sample->loopMode());
             // if there is no opcode defining loop ranges, use sample definitions as fallback (according to spec)
             if (r.loopStart == -1)
                   r.loopStart = z->sample->loopStart();
@@ -276,6 +308,29 @@ void ZInstrument::addRegion(SfzRegion& r)
       r.setZone(z);
       if (z->sample)
             addZone(z);
+      }
+//---------------------------------------------------------
+//   readLongLong
+//---------------------------------------------------------
+
+static void readLongLong(const QString& data, long long& val)
+      {
+      bool ok;
+      float d = data.toLongLong(&ok);
+      if (ok)
+            val = d;
+      }
+
+//---------------------------------------------------------
+//   readFloat
+//---------------------------------------------------------
+
+static void readFloat(const QString& data, float& val)
+      {
+      bool ok;
+      float d = data.toFloat(&ok);
+      if (ok)
+            val = d;
       }
 
 //---------------------------------------------------------
@@ -290,16 +345,22 @@ static void readDouble(const QString& data, double* val)
             *val = d;
       }
 
-//---------------------------------------------------------
-//   readInt
-//---------------------------------------------------------
-
-static void readInt(const QString& data, int* val)
+static void readFilterType(const QString& data, FilterType& filType)
       {
-      bool ok;
-      int i = data.toInt(&ok);
-      if (ok)
-            *val = i;
+      if (data == "lpf_1p")
+            filType = FilterType::lpf_1p;
+      else if (data == "lpf_2p")
+            filType = FilterType::lpf_2p;
+      else if (data == "hpf_1p")
+            filType = FilterType::hpf_1p;
+      else if (data == "hpf_2p")
+            filType = FilterType::hpf_2p;
+      else if (data == "bpf_2p")
+            filType = FilterType::bpf_2p;
+      else if (data == "brf_2p")
+            filType = FilterType::brf_2p;
+      else
+            qDebug("SfzRegion: not supported fil_type value: %s", qPrintable(data));
       }
 
 //---------------------------------------------------------
@@ -352,6 +413,7 @@ void SfzRegion::readOp(const QString& b, const QString& data, SfzControl &c)
       else if (opcode == "sample") {
             sample = path + "/" + c.defaultPath + "/" + opcode_data_full; // spaces are allowed
             sample.replace("\\", "/");
+            sample = sample.trimmed();
             }
       else if (opcode == "default_path") {
             c.defaultPath = opcode_data_full;
@@ -388,9 +450,9 @@ void SfzRegion::readOp(const QString& b, const QString& data, SfzControl &c)
                   qDebug("SfzRegion: loop_mode <%s>", qPrintable(opcode_data));
             }
       else if(opcode == "loop_start")
-            readInt(opcode_data, &loopStart);
+            readLongLong(opcode_data, loopStart);
       else if(opcode == "loop_end")
-            readInt(opcode_data, &loopEnd);
+            readLongLong(opcode_data, loopEnd);
       else if (opcode.startsWith("on_locc")) {
             int idx = b.mid(7).toInt();
             if (idx >= 0 && idx < 128)
@@ -480,6 +542,26 @@ void SfzRegion::readOp(const QString& b, const QString& data, SfzControl &c)
             seq_position = i;
       else if (opcode == "transpose")
             transpose = i;
+      else if (opcode == "delay")
+            readFloat(opcode_data, delay);
+      else if (opcode == "pan")
+            pan = i;
+      else if (opcode == "offset")
+            readLongLong(opcode_data, offset);
+      else if (opcode == "group_volume")
+            readFloat(opcode_data, group_volume);
+      else if (opcode == "cutoff") {
+            isCutoffDefined = true;
+            readFloat(opcode_data, cutoff);
+            }
+      else if (opcode == "fil_keycenter")
+            fil_keycenter = i;
+      else if (opcode == "fil_keytrack")
+            fil_keytrack = i;
+      else if (opcode == "fil_veltrack")
+            fil_veltrack = i;
+      else if (opcode == "fil_type")
+            readFilterType(opcode_data, fil_type);
       else
             qDebug("SfzRegion: unknown opcode <%s>", qPrintable(opcode));
       }

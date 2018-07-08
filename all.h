@@ -32,7 +32,6 @@
 #include <stdio.h>
 #include <limits.h>
 #include <map>
-#include <unordered_map>
 #include <set>
 #include <errno.h>
 #include <fcntl.h>
@@ -132,6 +131,7 @@
 #include <QProgressBar>
 #include <QProgressDialog>
 #include <QRadioButton>
+#include <QButtonGroup>
 #include <QSplashScreen>
 #include <QFontComboBox>
 #include <QApplication>

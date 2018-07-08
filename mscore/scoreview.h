@@ -175,6 +175,7 @@ class ScoreView : public QWidget, public MuseScoreView {
 
       virtual void keyPressEvent(QKeyEvent*) override;
       virtual void keyReleaseEvent(QKeyEvent*) override;
+      virtual void inputMethodEvent(QInputMethodEvent*) override;
 
       virtual void contextMenuEvent(QContextMenuEvent*) override;
 
@@ -186,7 +187,7 @@ class ScoreView : public QWidget, public MuseScoreView {
       void lassoSelect();
 
       void setShadowNote(const QPointF&);
-      void drawElements(QPainter& p,const QList<Element*>& el);
+      void drawElements(QPainter& p,QList<Element*>& el, Element* editElement);
       bool dragTimeAnchorElement(const QPointF& pos);
       bool dragMeasureAnchorElement(const QPointF& pos);
       void updateGrips();
@@ -232,7 +233,7 @@ class ScoreView : public QWidget, public MuseScoreView {
       void cmdMoveCR(bool left);
       void cmdGotoElement(Element*);
       bool checkCopyOrCut();
-      QVariant inputMethodQuery(Qt::InputMethodQuery query) const;
+      QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
       void startFotomode();
       void stopFotomode();
       void startFotoDrag();
@@ -319,7 +320,7 @@ class ScoreView : public QWidget, public MuseScoreView {
       void zoomStep(qreal step, const QPoint& pos);
       void zoom(qreal _mag, const QPointF& pos);
       void contextPopup(QContextMenuEvent* ev);
-      bool editKeyLyrics(QKeyEvent*);
+      bool editKeyLyrics();
       void dragScoreView(QMouseEvent* ev);
       void doDragElement(QMouseEvent* ev);
       void doDragLasso(QMouseEvent* ev);
@@ -327,8 +328,6 @@ class ScoreView : public QWidget, public MuseScoreView {
       void doDragEdit(QMouseEvent* ev);
       bool testElementDragTransition(QMouseEvent* ev);
       bool fotoEditElementDragTransition(QMouseEvent* ev);
-      bool editScoreViewDragTransition(QMouseEvent* e);
-      bool editSelectTransition(QMouseEvent* me);
       void addSlur();
       virtual void cmdAddSlur(ChordRest*, ChordRest*) override;
       virtual void cmdAddHairpin(HairpinType) override;

@@ -20,30 +20,26 @@
 namespace Ms {
 
 //---------------------------------------------------------
-//   StaffText
+//   StaffTextBase
 //---------------------------------------------------------
 
-StaffText::StaffText(Score* s)
-   : TextBase(s, ElementFlag::MOVABLE | ElementFlag::SELECTABLE | ElementFlag::ON_STAFF)
+StaffTextBase::StaffTextBase(Score* s, ElementFlags flags)
+   : TextBase(s, flags)
       {
-      init(SubStyle::STAFF);
-      setSwingParameters(MScore::division / 2, 60);
-      }
-
-StaffText::StaffText(SubStyle ss, Score* s)
-   : TextBase(s, ElementFlag::MOVABLE | ElementFlag::SELECTABLE | ElementFlag::ON_STAFF)
-      {
-      init(ss);
       setPlacement(Placement::ABOVE);     // default
       setSwingParameters(MScore::division / 2, 60);
       }
 
 //---------------------------------------------------------
-//   writeProperties
+//   write
 //---------------------------------------------------------
 
-void StaffText::writeProperties(XmlWriter& xml) const
+void StaffTextBase::write(XmlWriter& xml) const
       {
+      if (!xml.canWrite(this))
+            return;
+      xml.stag("StaffText");
+
       for (ChannelActions s : _channelActions) {
             int channel = s.channel;
             for (QString name : s.midiActionNames)
@@ -69,18 +65,7 @@ void StaffText::writeProperties(XmlWriter& xml) const
             xml.tagE(QString("swing unit=\"%1\" ratio= \"%2\"").arg(swingUnit).arg(swingRatio));
             }
       TextBase::writeProperties(xml);
-      }
 
-//---------------------------------------------------------
-//   write
-//---------------------------------------------------------
-
-void StaffText::write(XmlWriter& xml) const
-      {
-      if (!xml.canWrite(this))
-            return;
-      xml.stag("StaffText");
-      writeProperties(xml);
       xml.etag();
       }
 
@@ -88,7 +73,7 @@ void StaffText::write(XmlWriter& xml) const
 //   read
 //---------------------------------------------------------
 
-void StaffText::read(XmlReader& e)
+void StaffTextBase::read(XmlReader& e)
       {
       for (int voice = 0; voice < VOICES; ++voice)
             _channelNames[voice].clear();
@@ -103,7 +88,7 @@ void StaffText::read(XmlReader& e)
 //   readProperties
 //---------------------------------------------------------
 
-bool StaffText::readProperties(XmlReader& e)
+bool StaffTextBase::readProperties(XmlReader& e)
       {
       const QStringRef& tag(e.name());
 
@@ -171,7 +156,7 @@ bool StaffText::readProperties(XmlReader& e)
 //   clearAeolusStops
 //---------------------------------------------------------
 
-void StaffText::clearAeolusStops()
+void StaffTextBase::clearAeolusStops()
       {
       for (int i = 0; i < 4; ++i)
             aeolusStops[i] = 0;
@@ -181,7 +166,7 @@ void StaffText::clearAeolusStops()
 //   setAeolusStop
 //---------------------------------------------------------
 
-void StaffText::setAeolusStop(int group, int idx, bool val)
+void StaffTextBase::setAeolusStop(int group, int idx, bool val)
       {
       if (val)
             aeolusStops[group] |= (1 << idx);
@@ -193,7 +178,7 @@ void StaffText::setAeolusStop(int group, int idx, bool val)
 //   getAeolusStop
 //---------------------------------------------------------
 
-bool StaffText::getAeolusStop(int group, int idx) const
+bool StaffTextBase::getAeolusStop(int group, int idx) const
       {
       return aeolusStops[group] & (1 << idx);
       }
@@ -202,23 +187,23 @@ bool StaffText::getAeolusStop(int group, int idx) const
 //   layout
 //---------------------------------------------------------
 
-void StaffText::layout()
+void StaffTextBase::layout()
       {
       Staff* s = staff();
-      qreal y = placeAbove() ? styleP(StyleIdx::staffTextPosAbove) : styleP(StyleIdx::staffTextPosBelow) + (s ? s->height() : 0.0);
+      qreal y = placeAbove() ? styleP(Sid::staffTextPosAbove) : styleP(Sid::staffTextPosBelow) + (s ? s->height() : 0.0);
       setPos(QPointF(0.0, y));
       TextBase::layout1();
-      autoplaceSegmentElement(styleP(StyleIdx::staffTextMinDistance));
+      autoplaceSegmentElement(styleP(Sid::staffTextMinDistance));
       }
 
 //---------------------------------------------------------
 //   segment
 //---------------------------------------------------------
 
-Segment* StaffText::segment() const
+Segment* StaffTextBase::segment() const
       {
       if (!parent()->isSegment()) {
-            qDebug("StaffText parent %s\n", parent()->name());
+            qDebug("parent %s", parent()->name());
             return 0;
             }
       Segment* s = toSegment(parent());
@@ -229,17 +214,34 @@ Segment* StaffText::segment() const
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant StaffText::propertyDefault(P_ID id) const
+QVariant StaffTextBase::propertyDefault(Pid id) const
       {
       switch(id) {
-            case P_ID::SUB_STYLE:
-                  return int(SubStyle::STAFF);
-            case P_ID::PLACEMENT:
+            case Pid::SUB_STYLE:
+                  return int(SubStyleId::STAFF);
+            case Pid::PLACEMENT:
                   return int(Placement::ABOVE);
+            case Pid::FRAME:
+                  return false;
             default:
                   return TextBase::propertyDefault(id);
             }
       }
 
+//---------------------------------------------------------
+//   StaffText
+//---------------------------------------------------------
+
+StaffText::StaffText(Score* s)
+   : StaffTextBase(s, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
+      {
+      initSubStyle(SubStyleId::STAFF);
+      }
+
+StaffText::StaffText(SubStyleId ss, Score* s)
+   : StaffTextBase(s, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
+      {
+      initSubStyle(ss);
+      }
 }
 

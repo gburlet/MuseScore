@@ -39,6 +39,15 @@ struct SpannerValues {
       };
 
 //---------------------------------------------------------
+//   SubStyleMap
+//---------------------------------------------------------
+
+struct SubStyleMap {
+      QString name;
+      SubStyleId ss;
+      };
+
+//---------------------------------------------------------
 //   XmlReader
 //---------------------------------------------------------
 
@@ -63,6 +72,8 @@ class XmlReader : public QXmlStreamReader {
       Interval _transpose;
       QMap<int, LinkedElements*> _elinks;
       QMultiMap<int, int> _tracks;
+
+      QList<SubStyleMap> userTextStyles;
 
    public:
       XmlReader(QFile* f) : QXmlStreamReader(f), docName(f->fileName()) {}
@@ -136,6 +147,8 @@ class XmlReader : public QXmlStreamReader {
       QMultiMap<int, int>& tracks()         { return _tracks;     }
 
       void checkTuplets();
+      SubStyleId addUserTextStyle(const QString& name);
+      SubStyleId lookupUserTextStyle(const QString& name);
       };
 
 //---------------------------------------------------------
@@ -210,8 +223,8 @@ class XmlWriter : public QTextStream {
       void ntag(const char* name);
       void netag(const char* name);
 
-      void tag(P_ID id, void* data, void* defaultVal);
-      void tag(P_ID id, QVariant data, QVariant defaultData = QVariant());
+      void tag(Pid id, void* data, void* defaultVal);
+      void tag(Pid id, QVariant data, QVariant defaultData = QVariant());
       void tag(const char* name, QVariant data, QVariant defaultData = QVariant());
       void tag(const QString&, QVariant data);
       void tag(const char* name, const char* s)    { tag(name, QVariant(s)); }

@@ -88,6 +88,7 @@ class Harmony final : public TextBase {
 
       void determineRootBaseSpelling();
       virtual void draw(QPainter*) const override;
+      virtual void drawEditMode(QPainter* p, EditData& ed) override;
       void render(const QString&, qreal&, qreal&);
       void render(const QList<RenderAction>& renderList, qreal&, qreal&, int tpc, NoteSpellingType noteSpelling = NoteSpellingType::STANDARD, NoteCaseType noteCase = NoteCaseType::AUTO);
       virtual void styleChanged() override     { render(); }
@@ -103,6 +104,9 @@ class Harmony final : public TextBase {
       void setId(int d)                        { _id = d; }
       int id() const                           { return _id;           }
 
+      void setBaseCase(NoteCaseType c)         { _baseCase = c; }
+      void setRootCase(NoteCaseType c)         { _rootCase = c; }
+
       bool leftParen() const                   { return _leftParen;    }
       bool rightParen() const                  { return _rightParen;   }
       void setLeftParen(bool leftParen)        { _leftParen = leftParen; }
@@ -117,7 +121,7 @@ class Harmony final : public TextBase {
       void determineRootBaseSpelling(NoteSpellingType& rootSpelling, NoteCaseType& rootCase,
          NoteSpellingType& baseSpelling, NoteCaseType& baseCase);
 
-      virtual void textChanged() override;
+      void textChanged();
       virtual void layout() override;
 
       const QRectF& bboxtight() const          { return _tbbox;        }
@@ -155,7 +159,7 @@ class Harmony final : public TextBase {
       const QString& extensionName() const;
 
       QString xmlKind() const;
-      QString xmlText() const;
+      QString musicXmlText() const;
       QString xmlSymbols() const;
       QString xmlParens() const;
       QStringList xmlDegrees() const;
@@ -178,7 +182,7 @@ class Harmony final : public TextBase {
       virtual bool acceptDrop(EditData&) const override;
       virtual Element* drop(EditData&) override;
 
-      virtual QVariant propertyDefault(P_ID id) const override;
+      virtual QVariant propertyDefault(Pid id) const override;
       };
 
 }     // namespace Ms

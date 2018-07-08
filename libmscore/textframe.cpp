@@ -34,7 +34,7 @@ TBox::TBox(Score* score)
    : VBox(score)
       {
       setBoxHeight(Spatium(1));
-      _text  = new Text(SubStyle::FRAME, score);
+      _text  = new Text(SubStyleId::FRAME, score);
       _text->setLayoutToParentWidth(true);
       _text->setParent(this);
       }
@@ -63,6 +63,12 @@ void TBox::layout()
       _text->layout();
 
       qreal h = _text->height();
+      if (_text->empty()) {
+            QFontMetricsF fm = QFontMetricsF(_text->font(), MScore::paintDevice());
+            h = fm.ascent();
+            }
+      else
+            h = _text->height();
       qreal y = topMargin() * DPMM;
 #if 0
       if (_text->align() & Align::BOTTOM)
@@ -130,7 +136,7 @@ Element* TBox::drop(EditData& data)
                   {
                   Text* t = toText(e);
                   _text->undoSetText(t->xmlText());
-                  _text->undoChangeProperty(P_ID::SUB_STYLE, int(t->subStyle()));
+//TODO-ws                  _text->undoChangeProperty(Pid::SUB_STYLE, int(t->subStyle()));
                   delete e;
                   return _text;
                   }
@@ -150,7 +156,7 @@ void TBox::add(Element* e)
             // does not normally happen, since drop() handles this directly
             Text* t = toText(e);
             _text->undoSetText(t->xmlText());
-            _text->undoChangeProperty(P_ID::SUB_STYLE, int(t->subStyle()));
+//TODO-ws            _text->undoChangeProperty(Pid::SUB_STYLE, int(t->subStyle()));
             }
       else {
             VBox::add(e);
@@ -169,7 +175,7 @@ void TBox::remove(Element* el)
             // replace with new empty text element
             // this keeps undo/redo happier than just clearing the text
             qDebug("TBox::remove() - replacing _text");
-            _text = new Text(SubStyle::FRAME, score());
+            _text = new Text(SubStyleId::FRAME, score());
             _text->setLayoutToParentWidth(true);
             _text->setParent(this);
            }

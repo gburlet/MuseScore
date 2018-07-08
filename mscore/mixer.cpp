@@ -164,16 +164,16 @@ void PartEdit::playbackVoiceChanged()
                         switch (voice) {
                               case 0:
                               printf("undo\n");
-                                    staff->undoChangeProperty(P_ID::PLAYBACK_VOICE1, val);
+                                    staff->undoChangeProperty(Pid::PLAYBACK_VOICE1, val);
                                     break;
                               case 1:
-                                    staff->undoChangeProperty(P_ID::PLAYBACK_VOICE2, val);
+                                    staff->undoChangeProperty(Pid::PLAYBACK_VOICE2, val);
                                     break;
                               case 2:
-                                    staff->undoChangeProperty(P_ID::PLAYBACK_VOICE3, val);
+                                    staff->undoChangeProperty(Pid::PLAYBACK_VOICE3, val);
                                     break;
                               case 3:
-                                    staff->undoChangeProperty(P_ID::PLAYBACK_VOICE4, val);
+                                    staff->undoChangeProperty(Pid::PLAYBACK_VOICE4, val);
                                     break;
                               }
                         }
@@ -342,7 +342,7 @@ void Mixer::patchListChanged()
             bool drum        = m.part->instrument()->useDrumset();
             pe->patch->clear();
             for (const MidiPatch* p : pl) {
-                  if (p->drum == drum)
+                  if (p->drum == drum || p->synti != "Fluid")
                         pe->patch->addItem(p->name, QVariant::fromValue<void*>((void*)p));
                   }
             pe->setPart(m.part, m.articulation);
@@ -390,6 +390,9 @@ void Mixer::midiPrefsChanged(bool showMidiControls)
 
 void MuseScore::showMixer(bool val)
       {
+      if (!cs)
+            return;
+
       QAction* a = getAction("toggle-mixer");
       if (mixer == 0) {
             mixer = new Mixer(this);
@@ -559,7 +562,7 @@ void PartEdit::drumsetToggled(bool val, bool syncControls)
       Score* score = part->score();
       score->startCmd();
 
-      part->undoChangeProperty(P_ID::USE_DRUMSET, val);
+      part->undoChangeProperty(Pid::USE_DRUMSET, val);
       patch->clear();
       const QList<MidiPatch*> pl = synti->getPatchInfo();
       for (const MidiPatch* p : pl) {

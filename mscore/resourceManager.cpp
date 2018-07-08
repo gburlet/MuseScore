@@ -29,7 +29,7 @@ ResourceManager::ResourceManager(QWidget *parent) :
       setWindowFlags(this->windowFlags() & ~Qt::WindowContextHelpButtonHint);
       QDir dir;
       dir.mkpath(dataPath + "/locale");
-      baseAddr = "http://extensions.musescore.org/2.2/";
+      baseAddr = "http://extensions.musescore.org/2.3/";
       displayPlugins();
       displayLanguages();
       languagesTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
@@ -169,7 +169,7 @@ void ResourceManager::download()
             QList<MQZipReader::FileInfo> allFiles = zipFile.fileInfoList();
             bool result = true;
             foreach (MQZipReader::FileInfo fi, allFiles) {
-                  const QString absPath = destinationDir + QDir::separator() + fi.filePath;
+                  const QString absPath = destinationDir + "/" + fi.filePath;
                   if (fi.isFile) {
                         QFile f(absPath);
                         if (!f.open(QIODevice::WriteOnly)) {

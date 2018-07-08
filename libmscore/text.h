@@ -10,8 +10,8 @@
 //  the file LICENCE.GPL
 //=============================================================================
 
-#ifndef __SIMPLETEXT_H__
-#define __SIMPLETEXT_H__
+#ifndef __TEXT_H__
+#define __TEXT_H__
 
 #include "element.h"
 #include "elementlayout.h"
@@ -97,7 +97,6 @@ class TextCursor {
       void setColumn(int val)       { _column = val; }
       void setSelectLine(int val)   { _selectLine = val; }
       void setSelectColumn(int val) { _selectColumn = val; }
-      void setText(TextBase* t)     { _text = t; }
       int columns() const;
       void init();
 
@@ -112,7 +111,6 @@ class TextCursor {
       void updateCursorFormat();
       void setFormat(FormatId, QVariant);
       void changeSelectionFormat(FormatId id, QVariant val);
-      bool deleteChar() const;
       };
 
 //---------------------------------------------------------
@@ -188,25 +186,23 @@ class TextBlock {
 //---------------------------------------------------------
 
 class TextBase : public Element {
-      M_PROPERTY(QString, family,                 setFamily)
-      M_PROPERTY(qreal,   size,                   setSize)
-      M_PROPERTY(bool,    bold,                   setBold)
-      M_PROPERTY(bool,    italic,                 setItalic)
-      M_PROPERTY(bool,    underline,              setUnderline)
-      M_PROPERTY(QColor,  bgColor,                setBgColor)
-      M_PROPERTY(QColor,  frameColor,             setFrameColor)
-      M_PROPERTY(Align,   align,                  setAlign)
-      M_PROPERTY(bool,    hasFrame,               setHasFrame)
-      M_PROPERTY(bool,    circle,                 setCircle)
-      M_PROPERTY(bool,    square,                 setSquare)
-      M_PROPERTY(bool,    sizeIsSpatiumDependent, setSizeIsSpatiumDependent)
-      M_PROPERTY(Spatium, frameWidth,             setFrameWidth)
-      M_PROPERTY(Spatium, paddingWidth,           setPaddingWidth)
-      M_PROPERTY(int,     frameRound,             setFrameRound)
-      M_PROPERTY(QPointF, offset,                 setOffset)            // inch or spatium
-      M_PROPERTY(OffsetType, offsetType,          setOffsetType)
-
-      SubStyle _subStyle;
+      M_PROPERTY(QString,    family,                 setFamily)
+      M_PROPERTY(qreal,      size,                   setSize)
+      M_PROPERTY(bool,       bold,                   setBold)
+      M_PROPERTY(bool,       italic,                 setItalic)
+      M_PROPERTY(bool,       underline,              setUnderline)
+      M_PROPERTY(QColor,     bgColor,                setBgColor)
+      M_PROPERTY(QColor,     frameColor,             setFrameColor)
+      M_PROPERTY(Align,      align,                  setAlign)
+      M_PROPERTY(bool,       hasFrame,               setHasFrame)
+      M_PROPERTY(bool,       circle,                 setCircle)
+      M_PROPERTY(bool,       square,                 setSquare)
+      M_PROPERTY(bool,       sizeIsSpatiumDependent, setSizeIsSpatiumDependent)
+      M_PROPERTY(Spatium,    frameWidth,             setFrameWidth)
+      M_PROPERTY(Spatium,    paddingWidth,           setPaddingWidth)
+      M_PROPERTY(int,        frameRound,             setFrameRound)
+      M_PROPERTY(QPointF,    offset,                 setOffset)            // inch or spatium
+      M_PROPERTY(OffsetType, offsetType,             setOffsetType)
 
       // there are two representations of text; only one
       // might be valid and the other can be constructed from it
@@ -237,11 +233,6 @@ class TextBase : public Element {
    public:
       TextBase(Score* = 0, ElementFlags = ElementFlag::NOTHING);
       TextBase(const TextBase&);
-      void init(SubStyle st = SubStyle::DEFAULT);
-
-      SubStyle subStyle() const                    { return _subStyle; }
-      void setSubStyle(SubStyle ss)                { _subStyle = ss;   }
-      virtual void initSubStyle(SubStyle) override;
 
       virtual bool mousePress(EditData&) override;
 
@@ -274,6 +265,7 @@ class TextBase : public Element {
       virtual void editCut(EditData&) override;
       virtual void editCopy(EditData&) override;
       virtual void endEdit(EditData&) override;
+      void movePosition(EditData&, QTextCursor::MoveOperation);
 
       bool deleteSelectedText(EditData&);
 
@@ -285,9 +277,6 @@ class TextBase : public Element {
       void writeProperties(XmlWriter& xml, bool writeText) const { writeProperties(xml, writeText, true); }
       void writeProperties(XmlWriter&, bool, bool) const;
       bool readProperties(XmlReader&);
-
-      void spellCheckUnderline(bool) {}
-      virtual void styleChanged() override;
 
       virtual void paste(EditData&);
 
@@ -302,14 +291,13 @@ class TextBase : public Element {
 
       friend class TextBlock;
       friend class TextFragment;
-      virtual void textChanged() {}
       QString convertFromHtml(const QString& ss) const;
       static QString convertToHtml(const QString&, const TextStyle&);
       static QString tagEscape(QString s);
       static QString unEscape(QString s);
       static QString escape(QString s);
 
-      void undoSetText(const QString& s) { undoChangeProperty(P_ID::TEXT, s); }
+      void undoSetText(const QString& s) { undoChangeProperty(Pid::TEXT, s); }
       virtual QString accessibleInfo() const override;
       virtual QString screenReaderInfo() const override;
 
@@ -320,22 +308,19 @@ class TextBase : public Element {
 
       static bool validateText(QString& s);
       bool inHexState() const { return hexState >= 0; }
-      void endHexState();
-      void inputTransition(QInputMethodEvent*);
+      void endHexState(EditData&);
+      void inputTransition(EditData&, QInputMethodEvent*);
 
       QFont font() const;
       QFontMetricsF fontMetrics() const;
 
-      virtual QVariant getProperty(P_ID propertyId) const override;
-      virtual bool setProperty(P_ID propertyId, const QVariant& v) override;
-      virtual QVariant propertyDefault(P_ID id) const override;
-      virtual PropertyFlags& propertyFlags(P_ID) override;
-      virtual StyleIdx getPropertyStyle(P_ID) const override;
-      virtual void reset() override;
+      virtual QVariant getProperty(Pid propertyId) const override;
+      virtual bool setProperty(Pid propertyId, const QVariant& v) override;
+      virtual QVariant propertyDefault(Pid id) const override;
 
       void editInsertText(TextCursor*, const QString&);
 
-      TextCursor* cursor(EditData&);
+      TextCursor* cursor(const EditData&);
       const TextBlock& textBlock(int line) const { return _layout[line]; }
       TextBlock& textBlock(int line)             { return _layout[line]; }
       QList<TextBlock>& textBlockList()          { return _layout; }
@@ -356,10 +341,11 @@ class Text final : public TextBase {
 
    public:
       Text(Score* s = 0);
-      Text(SubStyle ss, Score* s = 0);
+      Text(SubStyleId ss, Score* s = 0);
 
       virtual ElementType type() const override    { return ElementType::TEXT; }
       virtual Text* clone() const override         { return new Text(*this); }
+      virtual void read(XmlReader&) override;
       };
 
 }     // namespace Ms

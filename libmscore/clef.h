@@ -162,6 +162,7 @@ class Clef final : public Element {
       bool showCourtesy() const        { return _showCourtesy; }
       void setShowCourtesy(bool v)     { _showCourtesy = v; }
       void undoSetShowCourtesy(bool v);
+      Clef* otherClef();
 
       static ClefType clefType(const QString& s);
       const char* clefTypeName();
@@ -178,9 +179,9 @@ class Clef final : public Element {
       void setClefType(const ClefTypeList& ctl) { _clefTypes = ctl; }
       virtual void spatiumChanged(qreal oldValue, qreal newValue) override;
 
-      QVariant getProperty(P_ID propertyId) const;
-      bool setProperty(P_ID propertyId, const QVariant&);
-      QVariant propertyDefault(P_ID id) const;
+      QVariant getProperty(Pid propertyId) const;
+      bool setProperty(Pid propertyId, const QVariant&);
+      QVariant propertyDefault(Pid id) const;
 
       virtual Element* nextSegmentElement() override;
       virtual Element* prevSegmentElement() override;

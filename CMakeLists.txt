@@ -31,25 +31,19 @@ endif (CI)
 # Libraries linked via full path no longer produce linker search paths.
 cmake_policy(SET CMP0003 NEW)
 
-# Don't to link executables to qtmain.lib automatically when they link to the QtCore IMPORTED target
-#if(POLICY CMP0020)
-#      cmake_policy(SET CMP0020 OLD)
-#endif(POLICY CMP0020)
+# Apperently needed on Mac only (?)
+if (APPLE)
+    # Issue no warning non-existent target argument to get_targer_property()
+    # and set the result variable to a -NOTFOUND value rather than issuing a FATAL_ERROR 40
+    if(POLICY CMP0045)
+        cmake_policy(SET CMP0045 OLD)
+    endif(POLICY CMP0045)
 
-# Issue no warning non-existent target argument to get_targer_property() and set the result variable to a -NOTFOUND value rather than issuing a FATAL_ERROR
-if(POLICY CMP0045)
-      cmake_policy(SET CMP0045 OLD)
-endif(POLICY CMP0045)
-
-# Silently ignore non-existent dependencies (mops1, mops2)
-if(POLICY CMP0046)
-      cmake_policy(SET CMP0046 OLD)
-endif(POLICY CMP0046)
-
-# Honor the legacy behavior for variable references and escape sequences
-if(POLICY CMP0053)
-      cmake_policy(SET CMP0053 OLD)
-endif(POLICY CMP0053)
+    # Silently ignore non-existent dependencies (mops1, mops2)
+    if(POLICY CMP0046)
+        cmake_policy(SET CMP0046 OLD)
+    endif(POLICY CMP0046)
+endif (APPLE)
 
 # RPATH settings on macOS do not affect install_name
 if(POLICY CMP0068)
@@ -110,6 +104,7 @@ option(HAS_AUDIOFILE "Enable audio export" ON)                 # Requires libsnd
 option(USE_SYSTEM_QTSINGLEAPPLICATION "Use system QtSingleApplication" OFF)
 option(USE_SYSTEM_FREETYPE "Use system FreeType" OFF)          # requires freetype >= 2.5.2, does not work on win
 option(BUILD_LAME    "Enable MP3 export" ON)                   # Requires libmp3lame (non-free), call CMake with -DBUILD_LAME="OFF" to disable
+option(DOWNLOAD_SOUNDFONT "Download the latest soundfont version as part of the build process" ON)
 
 SET(JACK_LONGNAME "JACK (Jack Audio Connection Kit)")
 SET(JACK_MIN_VERSION "0.98.0")
@@ -150,13 +145,13 @@ if (APPLE)
 endif (APPLE)
 
 #
-#     Check for GCC compiler >= 4.7
+#     Check for gcc compiler >= 4.8
 #
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
       if (${CMAKE_CXX_COMPILER_MAJOR} LESS 4
-        OR ((${CMAKE_CXX_COMPILER_MAJOR} EQUAL 4) AND (${CMAKE_CXX_COMPILER_MINOR} LESS 7)))
-            message(FATAL_ERROR "Bad GCC compiler version " ${CMAKE_CXX_COMPILER_VERSION}
-                  " >= 4.7 required")
+        OR ((${CMAKE_CXX_COMPILER_MAJOR} EQUAL 4) AND (${CMAKE_CXX_COMPILER_MINOR} LESS 8)))
+            message(FATAL_ERROR "bad gcc compiler version " ${CMAKE_CXX_COMPILER_VERSION}
+                  " >= 4.8 required")
       endif()
 endif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
 
@@ -218,6 +213,50 @@ else (MINGW OR APPLE)
       SET(Mscore_INSTALL_NAME  "mscore${MSCORE_INSTALL_SUFFIX}-${MUSESCORE_VERSION}/")
       SET(Mscore_SHARE_NAME    "share/")
 endif (MINGW OR APPLE)
+
+# Download MuseScore SoundFont
+if (DOWNLOAD_SOUNDFONT)
+  set (SF_VERSION_REMOTE_FILE ${PROJECT_BINARY_DIR}/VERSION)
+  set (SF_VERSION_LOCAL_FILE ${PROJECT_SOURCE_DIR}/share/sound/VERSION)
+  set (DOWNLOAD_URL_ROOT "http://ftp.osuosl.org/pub/musescore/soundfont/MuseScore_General")
+  set (SOUND_DIRECTORY ${PROJECT_SOURCE_DIR}/share/sound)
+
+  file(DOWNLOAD ${DOWNLOAD_URL_ROOT}/VERSION ${SF_VERSION_REMOTE_FILE} STATUS SF_VERSION_DL_STATUS_LIST)
+  list(GET SF_VERSION_DL_STATUS_LIST 0 SF_VERSION_DL_STATUS)
+
+  if(EXISTS ${SF_VERSION_REMOTE_FILE} AND SF_VERSION_DL_STATUS EQUAL 0)
+    file (STRINGS ${SF_VERSION_REMOTE_FILE} SF_VERSION_REMOTE)
+
+    set(SF_VERSION_LOCAL "0.0")
+    if (EXISTS ${SF_VERSION_LOCAL_FILE})
+      file (STRINGS ${SF_VERSION_LOCAL_FILE} SF_VERSION_LOCAL)
+    endif ()
+
+    string(COMPARE LESS ${SF_VERSION_LOCAL} ${SF_VERSION_REMOTE} DO_DOWNLOAD)
+    if (DO_DOWNLOAD)
+      message("Downloading version ${SF_VERSION_REMOTE} of the MuseScore SoundFont. Version is outdated ${SF_VERSION_LOCAL}.")
+      # delete soundfont and download new version
+      ## TODO check STATUS of downloads
+      file (REMOVE ${SOUND_DIRECTORY}/MuseScore_General.sf3
+                   ${SOUND_DIRECTORY}/MuseScore_General-License.md
+                   ${SOUND_DIRECTORY}/MuseScore_General-changelog.txt)
+      file(DOWNLOAD ${DOWNLOAD_URL_ROOT}/MuseScore_General.sf3 ${SOUND_DIRECTORY}/MuseScore_General.sf3 SHOW_PROGRESS STATUS SF_DL_STATUS)
+      list(GET SF_DL_STATUS 0 HTTP_STATUS)
+      if (NOT HTTP_STATUS EQUAL 0)
+        list(GET SF_DL_STATUS 1 HTTP_STATUS_TEXT)
+        message(FATAL_ERROR "Cannot download new soundfont. Error: ${HTTP_STATUS_TEXT}")
+      endif()
+      file(DOWNLOAD ${DOWNLOAD_URL_ROOT}/MuseScore_General-License.md ${SOUND_DIRECTORY}/MuseScore_General-License.md)
+      file(DOWNLOAD ${DOWNLOAD_URL_ROOT}/MuseScore_General-changelog.txt ${SOUND_DIRECTORY}/MuseScore_General-changelog.txt)
+      # replace VERSION file (in any case, delete VERSION file)
+      file (COPY ${SF_VERSION_REMOTE_FILE} DESTINATION ${SOUND_DIRECTORY})
+      file (REMOVE ${SF_VERSION_REMOTE_FILE})
+    else(DO_DOWNLOAD)
+      message("MuseScore SoundFont is up to date.")
+    endif(DO_DOWNLOAD)
+  endif()
+endif(DOWNLOAD_SOUNDFONT)
+
 
 if (BUILD_FOR_WINSTORE)
   set(FOR_WINSTORE 1)
@@ -318,23 +357,22 @@ IF(BUILD_JACK)
            IF("$ENV{PROCESSOR_ARCHITEW6432}" STREQUAL "")
               IF("$ENV{PROCESSOR_ARCHITECTURE}" STREQUAL "x86")
                  # "pure" 32-bit environment
-                 set (JACK_INCDIR "$ENV{PROGRAMFILES}/Jack/includes")
-                 set (JACK_LIB "$ENV{PROGRAMFILES}/Jack/lib/libjack.a")
+                 set (progenv "PROGRAMFILES")
               ELSE("$ENV{PROCESSOR_ARCHITECTURE}" STREQUAL "x86")
                  # "pure" 64-bit environment
-                 set (JACK_INCDIR "$ENV{PROGRAMFILES(x86)}/Jack/includes")
-                 set (JACK_LIB "$ENV{PROGRAMFILES(x86)}/Jack/lib/libjack.a")
+                 set (progenv "PROGRAMFILES(x86)")
               ENDIF("$ENV{PROCESSOR_ARCHITECTURE}" STREQUAL "x86")
            ELSE("$ENV{PROCESSOR_ARCHITEW6432}" STREQUAL "")
               IF("$ENV{PROCESSOR_ARCHITECTURE}" STREQUAL "x86")
                  # 32-bit program running with an underlying 64-bit environment
-                 set (JACK_INCDIR "$ENV{PROGRAMFILES(x86)}/Jack/includes")
-                 set (JACK_LIB "$ENV{PROGRAMFILES(x86)}/Jack/lib/libjack.a")
+                 set (progenv "PROGRAMFILES(x86)")
               ELSE("$ENV{PROCESSOR_ARCHITECTURE}" STREQUAL "x86")
                  # Theoretically impossible case...
                  MESSAGE(SEND_ERROR "Error: Impossible program/environment bitness combination deduced: 64-bit program running in 32-bit environment. This is a programming error. PROCESSOR_ARCHITEW6432=$ENV{PROCESSOR_ARCHITEW6432}. PROCESSOR_ARCHITECTURE=$ENV{PROCESSOR_ARCHITECTURE}")
               ENDIF("$ENV{PROCESSOR_ARCHITECTURE}" STREQUAL "x86")
            ENDIF("$ENV{PROCESSOR_ARCHITEW6432}" STREQUAL "")
+           set (JACK_INCDIR "$ENV{${progenv}}/Jack/includes")
+           set (JACK_LIB "$ENV{${progenv}}/Jack/lib/libjack.a")
            MESSAGE("JACK support enabled.")
      ELSE(MINGW)
            PKGCONFIG1 (jack ${JACK_MIN_VERSION} JACK_INCDIR JACK_LIBDIR JACK_LIB JACK_CPP)
@@ -576,7 +614,7 @@ subdirs(
       )
 #      thirdparty/xmlstream
 
-string(TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE)
+string(TOUPPER "${CMAKE_BUILD_TYPE}" CMAKE_BUILD_TYPE)
 if (APPLE AND CMAKE_BUILD_TYPE MATCHES "DEBUG")
 # With xcode, we need to have all the targets in the same project
 add_subdirectory(mtest)

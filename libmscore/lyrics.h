@@ -48,9 +48,9 @@ class Lyrics final : public TextBase {
       // it should be cleared to 0 at some point, so that it will not be carried over
       // if the melisma is not extended beyond a single chord, but no suitable place to do this
       // has been identified yet.
-      static const int  TEMP_MELISMA_TICKS      = 1;
 
       // metrics for dashes and melisma; all in sp. units:
+      static const int  TEMP_MELISMA_TICKS      = 1;
       static constexpr qreal  MELISMA_DEFAULT_PAD                 = 0.10;     // the empty space before a melisma line
       static constexpr qreal  LYRICS_DASH_DEFAULT_PAD             = 0.05;     // the min. empty space before and after a dash
 // WORD_MIN_DISTANCE has never been implemented
@@ -67,10 +67,13 @@ class Lyrics final : public TextBase {
                               ///< (melisma)
       Syllabic _syllabic;
       LyricsLine* _separator;
-      PropertyFlags placementStyle;
+      std::vector<StyledProperty> _styledProperties;
+
+      bool isMelisma() const;
 
    protected:
       int _no;                ///< row index
+      bool _even;
 #if defined(USE_FONT_DASH_METRIC)
       qreal _dashY;           // dash dimensions for lyrics line dashes
       qreal _dashLength;
@@ -89,6 +92,8 @@ class Lyrics final : public TextBase {
       virtual bool acceptDrop(EditData&) const override;
       virtual Element* drop(EditData&) override;
 
+      virtual const StyledProperty* styledProperties() const override { return _styledProperties.data(); }
+
       Segment* segment() const                        { return toSegment(parent()->parent()); }
       Measure* measure() const                        { return toMeasure(parent()->parent()->parent()); }
       ChordRest* chordRest() const                    { return toChordRest(parent()); }
@@ -98,9 +103,10 @@ class Lyrics final : public TextBase {
 
       virtual void write(XmlWriter& xml) const override;
       virtual void read(XmlReader&) override;
+      virtual bool readProperties(XmlReader&);
       virtual int subtype() const override            { return _no; }
       virtual QString subtypeName() const override    { return QObject::tr("Verse %1").arg(_no + 1); }
-      void setNo(int n);
+      void setNo(int n)                               { _no = n; }
       int no() const                                  { return _no; }
       bool isEven() const                             { return _no % 1; }
       void setSyllabic(Syllabic s)                    { _syllabic = s; }
@@ -112,7 +118,6 @@ class Lyrics final : public TextBase {
       int ticks() const                               { return _ticks;    }
       void setTicks(int tick)                         { _ticks = tick;    }
       int endTick() const;
-      bool isMelisma() const;
       void removeFromScore();
 
 #if defined(USE_FONT_DASH_METRIC)
@@ -126,14 +131,9 @@ class Lyrics final : public TextBase {
       using TextBase::paste;
       virtual void paste(EditData&) override;
 
-      virtual QVariant getProperty(P_ID propertyId) const override;
-      virtual bool setProperty(P_ID propertyId, const QVariant&) override;
-      virtual QVariant propertyDefault(P_ID id) const override;
-      virtual PropertyFlags& propertyFlags(P_ID) override;
-      virtual StyleIdx getPropertyStyle(P_ID) const override;
-      virtual void reset() override;
-      virtual void styleChanged() override;
-      virtual void resetProperty(P_ID id) override;
+      virtual QVariant getProperty(Pid propertyId) const override;
+      virtual bool setProperty(Pid propertyId, const QVariant&) override;
+      virtual QVariant propertyDefault(Pid id) const override;
       };
 
 //---------------------------------------------------------
@@ -156,7 +156,7 @@ class LyricsLine final : public SLine {
 
       Lyrics* lyrics() const                          { return toLyrics(parent());   }
       Lyrics* nextLyrics() const                      { return _nextLyrics;         }
-      virtual bool setProperty(P_ID propertyId, const QVariant& v) override;
+      virtual bool setProperty(Pid propertyId, const QVariant& v) override;
       };
 
 //---------------------------------------------------------
@@ -175,7 +175,9 @@ class LyricsLineSegment final : public LineSegment {
       virtual ElementType type() const override             { return ElementType::LYRICSLINE_SEGMENT; }
       virtual void draw(QPainter*) const override;
       virtual void layout() override;
+      // helper functions
       LyricsLine* lyricsLine() const                        { return toLyricsLine(spanner()); }
+      Lyrics* lyrics() const                                { return lyricsLine()->lyrics(); }
       };
 
 }     // namespace Ms

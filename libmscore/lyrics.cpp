@@ -20,6 +20,7 @@
 #include "staff.h"
 #include "segment.h"
 #include "undo.h"
+#include "textedit.h"
 
 namespace Ms {
 
@@ -60,18 +61,20 @@ static Lyrics* searchNextLyrics(Segment* s, int staffIdx, int verse, Placement p
 Lyrics::Lyrics(Score* s)
    : TextBase(s)
       {
-      init(SubStyle::LYRIC1);
+      _even = false;
+      _styledProperties = lyricsStyle;       // make copy
+      initSubStyle(SubStyleId::LYRIC);
       _no         = 0;
       _ticks      = 0;
       _syllabic   = Syllabic::SINGLE;
       _separator  = 0;
-      placementStyle = PropertyFlags::STYLED;
-      setPlacement(Placement(s->styleI(StyleIdx::lyricsPlacement)));
       }
 
 Lyrics::Lyrics(const Lyrics& l)
    : TextBase(l)
       {
+      _styledProperties = l._styledProperties;
+      _even      = l._even;
       _no        = l._no;
       _ticks     = l._ticks;
       _syllabic  = l._syllabic;
@@ -106,14 +109,14 @@ void Lyrics::write(XmlWriter& xml) const
       if (!xml.canWrite(this))
             return;
       xml.stag("Lyrics");
-      writeProperty(xml, P_ID::VERSE);
+      writeProperty(xml, Pid::VERSE);
       if (_syllabic != Syllabic::SINGLE) {
             static const char* sl[] = {
                   "single", "begin", "end", "middle"
                   };
             xml.tag("syllabic", sl[int(_syllabic)]);
             }
-      writeProperty(xml, P_ID::LYRIC_TICKS);
+      writeProperty(xml, Pid::LYRIC_TICKS);
 
       TextBase::writeProperties(xml);
       xml.etag();
@@ -125,55 +128,40 @@ void Lyrics::write(XmlWriter& xml) const
 
 void Lyrics::read(XmlReader& e)
       {
-      int   iEndTick = 0;           // used for backward compatibility
-      Text* _verseNumber = 0;
-
       while (e.readNextStartElement()) {
-            const QStringRef& tag(e.name());
-            if (tag == "no")
-                  _no = e.readInt();
-            else if (tag == "syllabic") {
-                  QString val(e.readElementText());
-                  if (val == "single")
-                        _syllabic = Syllabic::SINGLE;
-                  else if (val == "begin")
-                        _syllabic = Syllabic::BEGIN;
-                  else if (val == "end")
-                        _syllabic = Syllabic::END;
-                  else if (val == "middle")
-                        _syllabic = Syllabic::MIDDLE;
-                  else
-                        qDebug("bad syllabic property");
-                  }
-            else if (tag == "endTick") {          // obsolete
-                  // store <endTick> tag value until a <ticks> tag has been read
-                  // which positions this lyrics element in the score
-                  iEndTick = e.readInt();
-                  }
-            else if (tag == "ticks")
-                  _ticks = e.readInt();
-            else if (tag == "Number") {                           // obsolete
-                  _verseNumber = new Text(score());
-                  _verseNumber->read(e);
-                  _verseNumber->setParent(this);
-                  }
-            else if (tag == "placement") {
-                  placementStyle = PropertyFlags::UNSTYLED;
-                  TextBase::readProperties(e);
-                  }
-            else if (!TextBase::readProperties(e))
+            if (!readProperties(e))
                   e.unknown();
             }
-      // if any endTick, make it relative to current tick
-      if (iEndTick) {
-            _ticks = iEndTick - e.tick();
-            // qDebug("Lyrics::endTick: %d  ticks %d", iEndTick, _ticks);
-            }
-      if (_verseNumber) {
-            // TODO: add text to main text
-            }
+      }
 
-      delete _verseNumber;
+//---------------------------------------------------------
+//   readProperties
+//---------------------------------------------------------
+
+bool Lyrics::readProperties(XmlReader& e)
+      {
+      const QStringRef& tag(e.name());
+
+      if (tag == "no")
+            _no = e.readInt();
+      else if (tag == "syllabic") {
+            QString val(e.readElementText());
+            if (val == "single")
+                  _syllabic = Syllabic::SINGLE;
+            else if (val == "begin")
+                  _syllabic = Syllabic::BEGIN;
+            else if (val == "end")
+                  _syllabic = Syllabic::END;
+            else if (val == "middle")
+                  _syllabic = Syllabic::MIDDLE;
+            else
+                  qDebug("bad syllabic property");
+            }
+      else if (tag == "ticks")
+            _ticks = e.readInt();
+      else if (!TextBase::readProperties(e))
+            return false;
+      return true;
       }
 
 //---------------------------------------------------------
@@ -198,14 +186,14 @@ void Lyrics::remove(Element* el)
       {
       if (el->isLyricsLine()) {
             // only if separator still exists and is the right one
-            if (_separator != nullptr && el == _separator) {
+            if (_separator && el == _separator) {
                   // Lyrics::remove() and LyricsLine::removeUnmanaged() call each other;
                   // be sure each finds a clean context
                   LyricsLine* separ = _separator;
                   _separator = 0;
                   separ->setParent(0);
                   separ->removeUnmanaged();
-                  delete separ;
+//done in undo/redo?                  delete separ;
                   }
             }
       else
@@ -244,7 +232,6 @@ bool Lyrics::isMelisma() const
 void Lyrics::layout()
       {
       layout1();
-      adjustReadPos();
       }
 
 //---------------------------------------------------------
@@ -264,19 +251,19 @@ void Lyrics::layout()
 void Lyrics::layout1()
       {
       setPos(QPointF());
-      TextBase::layout1();
-      if (!parent()) // palette & clone trick
-          return;
+      if (!parent()) { // palette & clone trick
+            TextBase::layout1();
+            return;
+            }
 
-      qreal lh = lineSpacing() * score()->styleD(StyleIdx::lyricsLineHeight);
+      qreal lh = lineSpacing() * score()->styleD(Sid::lyricsLineHeight);
       qreal y = 0;
 
       if (placeBelow())
-//            y  = lh * (_no+1) + score()->styleP(StyleIdx::lyricsPosBelow) + staff()->height();
-            y  = lh * _no + score()->styleP(StyleIdx::lyricsPosBelow) + staff()->height();
+            y  = lh * _no + score()->styleP(Sid::lyricsPosBelow) + staff()->height();
       else {
             // we are counting _no from bottom to top for verses above
-            y = -lh * _no + score()->styleP(StyleIdx::lyricsPosAbove);
+            y = -lh * _no + score()->styleP(Sid::lyricsPosAbove);
             }
 
       qreal x  = 0.0;
@@ -287,7 +274,6 @@ void Lyrics::layout1()
       bool hasNumber     = false; // _verseNumber;
       qreal centerAdjust = 0.0;
       qreal leftAdjust   = 0.0;
-      QString s          = plainText();
 
       // find:
       // 1) string of numbers and non-word characters at start of syllable
@@ -295,45 +281,80 @@ void Lyrics::layout1()
       // 3) string of non-word characters at end of syllable
       //QRegularExpression leadingPattern("(^[\\d\\W]+)([^\\d\\W]+)");
 
-      if (score()->styleB(StyleIdx::lyricsAlignVerseNumber)) {
+      if (score()->styleB(Sid::lyricsAlignVerseNumber)) {
+            QString s = plainText();
             QRegularExpression punctuationPattern("(^[\\d\\W]*)([^\\d\\W].*?)([\\d\\W]*$)", QRegularExpression::UseUnicodePropertiesOption);
             QRegularExpressionMatch punctuationMatch = punctuationPattern.match(s);
             if (punctuationMatch.hasMatch()) {
-#if 0 // TODO::ws
                   // leading and trailing punctuation
                   QString lp = punctuationMatch.captured(1);
                   QString tp = punctuationMatch.captured(3);
                   // actual lyric
                   //QString actualLyric = punctuationMatch.captured(2);
-                  Text leading(*this);
-                  leading.setPlainText(lp);
-                  leading.layout1();
-                  Text trailing(*this);
-                  trailing.setPlainText(tp);
-                  trailing.layout1();
-                  leftAdjust = leading.width();
-                  centerAdjust = leading.width() - trailing.width();
-                  if (!lp.isEmpty() && lp[0].isDigit())
-                        hasNumber = true;
-#endif
+                  if (!lp.isEmpty() && !tp.isEmpty()) {
+                        qDebug("create leading, trailing <%s> -- <%s><%s>", qPrintable(s), qPrintable(lp), qPrintable(tp));
+                        Lyrics leading(*this);
+                        leading.setPlainText(lp);
+                        leading.layout1();
+                        Lyrics trailing(*this);
+                        trailing.setPlainText(tp);
+                        trailing.layout1();
+                        leftAdjust = leading.width();
+                        centerAdjust = leading.width() - trailing.width();
+                        if (!lp.isEmpty() && lp[0].isDigit())
+                              hasNumber = true;
+                        }
                   }
             }
 
+      bool styleDidChange = false;
+      if ((_no & 1) && !_even) {
+            _styledProperties[0].sid = Sid::lyricsEvenFontFace;
+            _styledProperties[1].sid = Sid::lyricsEvenFontSize;
+            _styledProperties[2].sid = Sid::lyricsEvenFontBold;
+            _styledProperties[3].sid = Sid::lyricsEvenFontItalic;
+            _styledProperties[4].sid = Sid::lyricsEvenFontUnderline;
+            _even             = true;
+            styleDidChange    = true;
+            }
+      if (!(_no & 1) && _even) {
+            _styledProperties[0].sid = Sid::lyricsOddFontFace;
+            _styledProperties[1].sid = Sid::lyricsOddFontSize;
+            _styledProperties[2].sid = Sid::lyricsOddFontBold;
+            _styledProperties[3].sid = Sid::lyricsOddFontItalic;
+            _styledProperties[4].sid = Sid::lyricsOddFontUnderline;
+            _even             = false;
+            styleDidChange    = true;
+            }
+      if (isMelisma() || hasNumber) {
+            if (_styledProperties[5].sid != Sid::lyricsMelismaAlign) {
+                  _styledProperties[5].sid = Sid::lyricsMelismaAlign;
+                  styleDidChange = true;
+                  }
+            }
+      else {
+            if (_styledProperties[5].sid != (_even ? Sid::lyricsEvenAlign : Sid::lyricsOddAlign)) {
+                  _styledProperties[5].sid = _even ? Sid::lyricsEvenAlign : Sid::lyricsOddAlign;
+                  styleDidChange = true;
+                  }
+            }
+      if (styleDidChange)
+            styleChanged();
+
+      TextBase::layout1();
+
       ChordRest* cr = chordRest();
-      Align ta = align();
-      if (ta & Align::HCENTER) {
+
+      if (align() & Align::HCENTER) {
             //
             // center under notehead, not origin
             // however, lyrics that are melismas or have verse numbers will be forced to left alignment
-            // TODO: provide a way to disable the automatic left alignment
             //
+            // center under note head
             qreal nominalWidth = symWidth(SymId::noteheadBlack);
-            if (!isMelisma() && !hasNumber)     // center under notehead
-                  x += nominalWidth * .5 - cr->x() - centerAdjust * 0.5;
-            else                                // force left alignment
-                  x += width() * .5 - cr->x() - leftAdjust;
+            x += nominalWidth * .5 - cr->x() - centerAdjust * 0.5;
             }
-      else if (!(ta & Align::RIGHT)) {
+      else if (!(align() & Align::RIGHT)) {
             // even for left aligned syllables, ignore leading verse numbers and/or punctuation
             x -= leftAdjust;
             }
@@ -342,7 +363,7 @@ void Lyrics::layout1()
       rypos() += y;
 
       if (_ticks > 0 || _syllabic == Syllabic::BEGIN || _syllabic == Syllabic::MIDDLE) {
-            if (_separator == nullptr) {
+            if (!_separator) {
                   _separator = new LyricsLine(score());
                   _separator->setTick(cr->tick());
                   score()->addUnmanagedSpanner(_separator);
@@ -373,12 +394,13 @@ void Lyrics::layout1()
    #endif
                   }
 #endif
+            bbox().setWidth(bbox().width());  // ??
             }
       else {
             if (_separator) {
                   _separator->removeUnmanaged();
                   delete _separator;
-                  _separator = nullptr;
+                  _separator = 0;
                   }
             }
       }
@@ -495,23 +517,6 @@ Element* Lyrics::drop(EditData& data)
       }
 
 //---------------------------------------------------------
-//   setNo
-//---------------------------------------------------------
-
-void Lyrics::setNo(int n)
-      {
-      _no = n;
-      // adjust between LYRICS1 and LYRICS2 only; keep other styles as they are
-      // (_no is 0-based, so odd _no means even line and viceversa)
-      if (type() == ElementType::LYRICS) {
-            if ((_no & 1) && subStyle() == SubStyle::LYRIC1)
-                  initSubStyle(SubStyle::LYRIC2);
-            if (!(_no & 1) && subStyle() == SubStyle::LYRIC2)
-                  initSubStyle(SubStyle::LYRIC1);
-            }
-      }
-
-//---------------------------------------------------------
 //   endEdit
 //---------------------------------------------------------
 
@@ -530,7 +535,7 @@ void Lyrics::removeFromScore()
       if (_separator) {
             _separator->removeUnmanaged();
             delete _separator;
-            _separator = nullptr;
+            _separator = 0;
             }
       }
 
@@ -538,14 +543,14 @@ void Lyrics::removeFromScore()
 //   getProperty
 //---------------------------------------------------------
 
-QVariant Lyrics::getProperty(P_ID propertyId) const
+QVariant Lyrics::getProperty(Pid propertyId) const
       {
       switch (propertyId) {
-            case P_ID::SYLLABIC:
+            case Pid::SYLLABIC:
                   return int(_syllabic);
-            case P_ID::LYRIC_TICKS:
+            case Pid::LYRIC_TICKS:
                   return _ticks;
-            case P_ID::VERSE:
+            case Pid::VERSE:
                   return _no;
             default:
                   return TextBase::getProperty(propertyId);
@@ -556,20 +561,19 @@ QVariant Lyrics::getProperty(P_ID propertyId) const
 //   setProperty
 //---------------------------------------------------------
 
-bool Lyrics::setProperty(P_ID propertyId, const QVariant& v)
+bool Lyrics::setProperty(Pid propertyId, const QVariant& v)
       {
       switch (propertyId) {
-            case P_ID::PLACEMENT:
-                  placementStyle = PropertyFlags::UNSTYLED;
+            case Pid::PLACEMENT:
                   setPlacement(Placement(v.toInt()));
                   break;
-            case P_ID::SYLLABIC:
+            case Pid::SYLLABIC:
                   _syllabic = Syllabic(v.toInt());
                   break;
-            case P_ID::LYRIC_TICKS:
+            case Pid::LYRIC_TICKS:
                   _ticks = v.toInt();
                   break;
-            case P_ID::VERSE:
+            case Pid::VERSE:
                   _no = v.toInt();
                   break;
             default:
@@ -585,19 +589,20 @@ bool Lyrics::setProperty(P_ID propertyId, const QVariant& v)
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant Lyrics::propertyDefault(P_ID id) const
+QVariant Lyrics::propertyDefault(Pid id) const
       {
       switch (id) {
-            case P_ID::SUB_STYLE:
-                  return int(SubStyle::LYRIC1);
-            case P_ID::PLACEMENT:
-                  return score()->styleI(StyleIdx::lyricsPlacement);
-            case P_ID::SYLLABIC:
+            case Pid::SUB_STYLE:
+                  return int(SubStyleId::LYRIC);
+            case Pid::PLACEMENT:
+                  return score()->styleI(Sid::lyricsPlacement);
+            case Pid::SYLLABIC:
                   return int(Syllabic::SINGLE);
-            case P_ID::LYRIC_TICKS:
-            case P_ID::VERSE:
+            case Pid::LYRIC_TICKS:
+            case Pid::VERSE:
                   return 0;
-            default: return TextBase::propertyDefault(id);
+            default:
+                  return TextBase::propertyDefault(id);
             }
       }
 
@@ -606,13 +611,11 @@ QVariant Lyrics::propertyDefault(P_ID id) const
 //=========================================================
 
 LyricsLine::LyricsLine(Score* s)
-  : SLine(s)
+  : SLine(s, ElementFlag::NOT_SELECTABLE)
       {
-      setFlags(0);
-
       setGenerated(true);           // no need to save it, as it can be re-generated
       setDiagonal(false);
-      setLineWidth(Spatium(Lyrics::LYRICS_DASH_DEFAULT_LINE_THICKNESS));
+      setLineWidth(Lyrics::LYRICS_DASH_DEFAULT_LINE_THICKNESS * spatium());
       setAnchor(Spanner::Anchor::SEGMENT);
       _nextLyrics = 0;
       }
@@ -631,17 +634,19 @@ void LyricsLine::layout()
       {
       bool tempMelismaTicks = (lyrics()->ticks() == Lyrics::TEMP_MELISMA_TICKS);
       if (lyrics()->ticks()) {              // melisma
-            setLineWidth(score()->styleS(StyleIdx::lyricsLineThickness));
+            setLineWidth(score()->styleP(Sid::lyricsLineThickness));
             // if lyrics has a temporary one-chord melisma, set to 0 ticks (just its own chord)
             if (tempMelismaTicks)
                   lyrics()->setTicks(0);
+
             // Lyrics::_ticks points to the beginning of the last spanned segment,
             // but the line shall include it:
             // include the duration of this last segment in the melisma duration
             Segment* lyricsSegment = lyrics()->segment();
-            int lyricsStartTick = lyricsSegment->tick();
-            int lyricsEndTick = lyrics()->endTick();
-            int lyricsTrack = lyrics()->track();
+            int lyricsStartTick    = lyricsSegment->tick();
+            int lyricsEndTick      = lyrics()->endTick();
+            int lyricsTrack        = lyrics()->track();
+
             // find segment with tick >= endTick
             Segment* s = lyricsSegment;
             while (s && s->tick() < lyricsEndTick)
@@ -685,12 +690,12 @@ void LyricsLine::layout()
                         if (!e || e->type() != ElementType::CHORD) {
                               // nothing to do but set ticks to 0
                               // this will result in melisma being deleted later
-                              lyrics()->undoChangeProperty(P_ID::LYRIC_TICKS, 0);
+                              lyrics()->undoChangeProperty(Pid::LYRIC_TICKS, 0);
                               setTicks(0);
                               return;
                               }
                         }
-                  lyrics()->undoChangeProperty(P_ID::LYRIC_TICKS, ps->tick() - lyricsStartTick);
+                  lyrics()->undoChangeProperty(Pid::LYRIC_TICKS, ps->tick() - lyricsStartTick);
                   }
             setTicks(s->tick() - lyricsStartTick);
             }
@@ -742,16 +747,16 @@ void LyricsLine::removeUnmanaged()
 //   setProperty
 //---------------------------------------------------------
 
-bool LyricsLine::setProperty(P_ID propertyId, const QVariant& v)
+bool LyricsLine::setProperty(Pid propertyId, const QVariant& v)
       {
       switch (propertyId) {
-            case P_ID::SPANNER_TICKS:
+            case Pid::SPANNER_TICKS:
                   {
                   // if parent lyrics has a melisma, change its length too
                   if (parent() && parent()->type() == ElementType::LYRICS
                               && toLyrics(parent())->ticks() > 0) {
                         int newTicks   = toLyrics(parent())->ticks() + v.toInt() - ticks();
-                        parent()->undoChangeProperty(P_ID::LYRIC_TICKS, newTicks);
+                        parent()->undoChangeProperty(Pid::LYRIC_TICKS, newTicks);
                         }
                   setTicks(v.toInt());
                   }
@@ -770,10 +775,8 @@ bool LyricsLine::setProperty(P_ID propertyId, const QVariant& v)
 //=========================================================
 
 LyricsLineSegment::LyricsLineSegment(Score* s)
-      : LineSegment(s)
+      : LineSegment(s, ElementFlag::ON_STAFF | ElementFlag::NOT_SELECTABLE)
       {
-      setFlags(ElementFlag::SEGMENT | ElementFlag::ON_STAFF);
-      clearFlags(ElementFlag::SELECTABLE | ElementFlag::MOVABLE);
       setGenerated(true);
       }
 
@@ -800,9 +803,7 @@ void LyricsLineSegment::layout()
       // HORIZONTAL POSITION
       // A) if line precedes a syllable, advance line end to right before the next syllable text
       // if not a melisma and there is a next syllable;
-      if (!isEndMelisma && lyricsLine()->nextLyrics() != nullptr
-                  && (spannerSegmentType() == SpannerSegmentType::END
-                        || spannerSegmentType() == SpannerSegmentType::SINGLE)) {
+      if (!isEndMelisma && lyricsLine()->nextLyrics() && isSingleEndType()) {
             lyr         = nextLyr = lyricsLine()->nextLyrics();
             sys         = lyr->segment()->system();
             endOfSystem = (sys != system());
@@ -819,24 +820,26 @@ void LyricsLineSegment::layout()
                   }
             }
       // B) if line follows a syllable, advance line start to after the syllable text
-      lyr   = lyricsLine()->lyrics();
-      sys   = lyr->segment()->system();
-      if (sys && (spannerSegmentType() == SpannerSegmentType::BEGIN || spannerSegmentType() == SpannerSegmentType::SINGLE)) {
+      lyr  = lyricsLine()->lyrics();
+      sys  = lyr->segment()->system();
+      if (sys && isSingleBeginType()) {
             qreal lyrX        = lyr->bbox().x();
             qreal lyrXp       = lyr->pagePos().x();
             qreal lyrW        = lyr->bbox().width();
             qreal sysXp       = sys->pagePos().x();
             fromX             = lyrXp - sysXp + lyrX + lyrW;
             //               syst.rel. X pos. | lyr.advance
-            qreal offsetX     = fromX - pos().x() + (isEndMelisma ? Lyrics::MELISMA_DEFAULT_PAD : Lyrics::LYRICS_DASH_DEFAULT_PAD) * sp;
+            qreal offsetX     = fromX - pos().x();
+            offsetX           += (isEndMelisma ? Lyrics::MELISMA_DEFAULT_PAD : Lyrics::LYRICS_DASH_DEFAULT_PAD) * sp;
+
             //               delta from curr.pos. | add initial padding
             rxpos()           += offsetX;
             rxpos2()          -= offsetX;
             }
 
       // VERTICAL POSITION: at the base line of the syllable text
-      if (spannerSegmentType() != SpannerSegmentType::END)
-            rypos() = lyr->y();
+      if (!isEndType())
+            rypos() = lyr->ipos().y();
       else {
             // use Y position of *next* syllable if there is one on same system
             Lyrics* nextLyr = searchNextLyrics(lyr->segment(), lyr->staffIdx(), lyr->no(), lyr->placement());
@@ -849,14 +852,10 @@ void LyricsLineSegment::layout()
       // MELISMA vs. DASHES
       if (isEndMelisma) {                 // melisma
             _numOfDashes = 1;
-            rypos()  -= lyricsLine()->lineWidth().val() * sp * HALF; // let the line 'sit on' the base line
-            qreal offsetX = score()->styleP(StyleIdx::minNoteDistance) * mag();
+            rypos()      -= lyricsLine()->lineWidth() * HALF; // let the line 'sit on' the base line
+            qreal offsetX = score()->styleP(Sid::minNoteDistance) * mag();
             // if final segment, extend slightly after the chord, otherwise shorten it
-            rxpos2() +=
-                  (spannerSegmentType() == SpannerSegmentType::BEGIN ||
-                        spannerSegmentType() == SpannerSegmentType::MIDDLE)
-                  ? -offsetX : +offsetX;
-
+            rxpos2() += (isBeginType() || isEndType()) ? -offsetX : +offsetX;
             }
       else {                              // dash(es)
 #if defined(USE_FONT_DASH_METRIC)
@@ -865,14 +864,14 @@ void LyricsLineSegment::layout()
 #else
             // set conventional dash Y pos
             rypos() -= MScore::pixelRatio * lyr->fontMetrics().xHeight() * Lyrics::LYRICS_DASH_Y_POS_RATIO;
-            _dashLength = score()->styleP(StyleIdx::lyricsDashMaxLength) * mag();  // and dash length
+            _dashLength = score()->styleP(Sid::lyricsDashMaxLength) * mag();  // and dash length
 #endif
             qreal len         = pos2().x();
-            qreal minDashLen  = score()->styleS(StyleIdx::lyricsDashMinLength).val() * sp;
-            qreal maxDashDist = score()->styleS(StyleIdx::lyricsDashMaxDistance).val() * sp;
+            qreal minDashLen  = score()->styleS(Sid::lyricsDashMinLength).val() * sp;
+            qreal maxDashDist = score()->styleS(Sid::lyricsDashMaxDistance).val() * sp;
             if (len < minDashLen) {                                           // if no room for a dash
                   // if at end of system or dash is forced
-                  if (endOfSystem || score()->styleB(StyleIdx::lyricsDashForce)) {
+                  if (endOfSystem || score()->styleB(Sid::lyricsDashForce)) {
                         rxpos2()          = minDashLen;                       //     draw minimal dash
                         _numOfDashes      = 1;
                         _dashLength       = minDashLen;
@@ -895,9 +894,8 @@ void LyricsLineSegment::layout()
 
       // set bounding box
       QRectF r = QRectF(0.0, 0.0, pos2().x(), pos2().y()).normalized();
-      qreal lw = spatium() * lyricsLine()->lineWidth().val() * HALF;
+      qreal lw = lyricsLine()->lineWidth() * HALF;
       setbbox(r.adjusted(-lw, -lw, lw, lw));
-      adjustReadPos();
       }
 
 //---------------------------------------------------------
@@ -908,10 +906,9 @@ void LyricsLineSegment::draw(QPainter* painter) const
       {
       if (_numOfDashes < 1)               // nothing to draw
             return;
-      qreal _spatium = spatium();
 
       QPen pen(lyricsLine()->lyrics()->curColor());
-      pen.setWidthF(lyricsLine()->lineWidth().val() * _spatium);
+      pen.setWidthF(lyricsLine()->lineWidth());
       pen.setCapStyle(Qt::FlatCap);
       painter->setPen(pen);
       if (lyricsLine()->lyrics()->ticks() > 0)           // melisma
@@ -921,87 +918,6 @@ void LyricsLineSegment::draw(QPainter* painter) const
             qreal x     = step - _dashLength * HALF;
             for (int i = 0; i < _numOfDashes; i++, x += step)
                   painter->drawLine(QPointF(x, 0.0), QPointF(x + _dashLength, 0.0));
-            }
-      }
-
-//---------------------------------------------------------
-//   propertyStyle
-//---------------------------------------------------------
-
-PropertyFlags& Lyrics::propertyFlags(P_ID id)
-      {
-      switch (id) {
-            case P_ID::PLACEMENT:
-                  return ScoreElement::propertyFlags(id);   // return PropertyFlags::NOSTYLE;
-
-            default:
-                  return TextBase::propertyFlags(id);
-            }
-      }
-
-//---------------------------------------------------------
-//   getPropertyStyle
-//---------------------------------------------------------
-
-StyleIdx Lyrics::getPropertyStyle(P_ID id) const
-      {
-      switch (id) {
-            case P_ID::PLACEMENT:
-                  return StyleIdx::lyricsPlacement;
-            case P_ID::FONT_FACE:
-                  return isEven() ? StyleIdx::lyricsEvenFontFace : StyleIdx::lyricsOddFontFace;
-            case P_ID::FONT_SIZE:
-                  return isEven() ? StyleIdx::lyricsEvenFontSize : StyleIdx::lyricsOddFontSize;
-            case P_ID::FONT_BOLD:
-                  return isEven() ? StyleIdx::lyricsEvenFontBold : StyleIdx::lyricsOddFontBold;
-            case P_ID::FONT_ITALIC:
-                  return isEven() ? StyleIdx::lyricsEvenFontItalic : StyleIdx::lyricsOddFontItalic;
-            case P_ID::FONT_UNDERLINE:
-                  return isEven() ? StyleIdx::lyricsEvenFontUnderline : StyleIdx::lyricsOddFontUnderline;
-            case P_ID::ALIGN:
-                  return isEven() ? StyleIdx::lyricsEvenAlign : StyleIdx::lyricsOddAlign;
-            default:
-                  break;
-            }
-      return StyleIdx::NOSTYLE;
-      }
-
-//---------------------------------------------------------
-//   styleChanged
-//    reset all styled values to actual style
-//---------------------------------------------------------
-
-void Lyrics::styleChanged()
-      {
-      if (placementStyle == PropertyFlags::STYLED)
-            setPlacement(Placement(score()->styleI(StyleIdx::lyricsPlacement)));
-      TextBase::styleChanged();
-      }
-
-//---------------------------------------------------------
-//   reset
-//---------------------------------------------------------
-
-void Lyrics::reset()
-      {
-      undoResetProperty(P_ID::PLACEMENT);
-      TextBase::reset();
-      }
-
-//---------------------------------------------------------
-//   resetProperty
-//---------------------------------------------------------
-
-void Lyrics::resetProperty(P_ID id)
-      {
-      switch (id) {
-            case P_ID::PLACEMENT:
-                  setProperty(id, propertyDefault(id));
-                  placementStyle = PropertyFlags::STYLED;
-                  break;
-
-            default:
-                  return TextBase::resetProperty(id);
             }
       }
 

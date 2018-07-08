@@ -222,7 +222,7 @@ class MuseScore : public QMainWindow, public MuseScoreCore {
       QSettings settings;
       ScoreView* cv                        { 0 };
       ScoreState _sstate;
-      UpdateChecker* ucheck;
+      UpdateChecker* ucheck = nullptr;
 
       static const std::list<const char*> _allNoteInputMenuEntries;
       static const std::list<const char*> _basicNoteInputMenuEntries;
@@ -459,6 +459,7 @@ class MuseScore : public QMainWindow, public MuseScoreCore {
 
       void updateViewModeCombo();
       void switchLayoutMode(LayoutMode);
+      void setPlayRepeats(bool repeat);
 
    private slots:
       void cmd(QAction* a, const QString& cmd);
@@ -750,7 +751,7 @@ class MuseScore : public QMainWindow, public MuseScoreCore {
       LoginManager* loginManager()     { return _loginManager; }
       QHelpEngine*  helpEngine() const { return _helpEngine;   }
 
-      void updateInspector();
+      virtual void updateInspector() override;
       void showSynthControl(bool);
       void showMixer(bool);
 
@@ -768,11 +769,14 @@ class MuseScore : public QMainWindow, public MuseScoreCore {
 
       void setNoteInputMenuEntries(std::list<const char*> l)         { _noteInputMenuEntries = l; }
       void populateNoteInputMenu();
+      static void updateUiStyleAndTheme();
 
       void showError();
 
       static void saveGeometry(QWidget const*const qw);
       static void restoreGeometry(QWidget*const qw);
+
+      void updateWindowTitle(Score* score);
       };
 
 extern MuseScore* mscore;

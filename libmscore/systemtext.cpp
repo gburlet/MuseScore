@@ -19,26 +19,26 @@ namespace Ms {
 //---------------------------------------------------------
 
 SystemText::SystemText(Score* s)
-   : TextBase(s, ElementFlag::SYSTEM)
+   : StaffTextBase(s, ElementFlag::SYSTEM)
       {
-      init(SubStyle::SYSTEM);
+      initSubStyle(SubStyleId::SYSTEM);
       }
 
-SystemText::SystemText(SubStyle ss, Score* s)
-   : TextBase(s, ElementFlag::SYSTEM)
+SystemText::SystemText(SubStyleId ss, Score* s, ElementFlags flags)
+   : StaffTextBase(s, flags)
       {
-      init(ss);
+      initSubStyle(ss);
       }
 
 //---------------------------------------------------------
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant SystemText::propertyDefault(P_ID id) const
+QVariant SystemText::propertyDefault(Pid id) const
       {
       switch (id) {
-            case P_ID::SUB_STYLE:
-                  return int(SubStyle::SYSTEM);
+            case Pid::SUB_STYLE:
+                  return int(SubStyleId::SYSTEM);
             default:
                   return TextBase::propertyDefault(id);
             }

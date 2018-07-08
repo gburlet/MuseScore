@@ -28,17 +28,18 @@ namespace Ms {
 //---------------------------------------------------------
 
 InstrumentChange::InstrumentChange(Score* s)
-   : TextBase(s, ElementFlag::MOVABLE | ElementFlag::SELECTABLE | ElementFlag::ON_STAFF)
+   : TextBase(s, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
       {
-      init(SubStyle::INSTRUMENT_CHANGE);
+      initSubStyle(SubStyleId::INSTRUMENT_CHANGE);
+      setPlacement(Placement::ABOVE);
       _instrument = new Instrument();
       }
 
 InstrumentChange::InstrumentChange(const Instrument& i, Score* s)
-   : TextBase(s)
+   : TextBase(s, ElementFlag::MOVABLE | ElementFlag::ON_STAFF)
       {
-      init(SubStyle::INSTRUMENT_CHANGE);
-      setFlags(ElementFlag::MOVABLE | ElementFlag::SELECTABLE | ElementFlag::ON_STAFF);
+      initSubStyle(SubStyleId::INSTRUMENT_CHANGE);
+      setPlacement(Placement::ABOVE);
       _instrument = new Instrument(i);
       }
 
@@ -102,7 +103,7 @@ void InstrumentChange::read(XmlReader& e)
 //   getProperty
 //---------------------------------------------------------
 
-QVariant InstrumentChange::getProperty(P_ID propertyId) const
+QVariant InstrumentChange::getProperty(Pid propertyId) const
       {
       switch (propertyId) {
             default:
@@ -114,11 +115,13 @@ QVariant InstrumentChange::getProperty(P_ID propertyId) const
 //   propertyDefault
 //---------------------------------------------------------
 
-QVariant InstrumentChange::propertyDefault(P_ID propertyId) const
+QVariant InstrumentChange::propertyDefault(Pid propertyId) const
       {
       switch (propertyId) {
-            case P_ID::SUB_STYLE:
-                  return int(SubStyle::INSTRUMENT_CHANGE);
+            case Pid::PLACEMENT:
+                  return int(Placement::ABOVE);
+            case Pid::SUB_STYLE:
+                  return int(SubStyleId::INSTRUMENT_CHANGE);
             default:
                   return TextBase::propertyDefault(propertyId);
             }
@@ -128,7 +131,7 @@ QVariant InstrumentChange::propertyDefault(P_ID propertyId) const
 //   setProperty
 //---------------------------------------------------------
 
-bool InstrumentChange::setProperty(P_ID propertyId, const QVariant& v)
+bool InstrumentChange::setProperty(Pid propertyId, const QVariant& v)
       {
       switch (propertyId) {
             default:

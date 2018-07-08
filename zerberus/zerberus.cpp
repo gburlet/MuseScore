@@ -98,16 +98,6 @@ void Zerberus::trigger(Channel* channel, int key, int velo, Trigger trigger, int
       double random = (double) rand() / (double) RAND_MAX;
       for (Zone* z : i->zones()) {
             if (z->match(channel, key, velo, trigger, random, cc, ccVal)) {
-                  if (freeVoices.empty()) {
-                        qDebug("Zerberus: out of voices...");
-                        return;
-                        }
-                  Voice* voice = freeVoices.pop();
-                  Q_ASSERT(voice->isOff());
-                  voice->start(channel, key, velo, z, durSinceNoteOn);
-                  voice->setNext(activeVoices);
-                  activeVoices = voice;
-
                   //
                   // handle offBy voices
                   //
@@ -121,6 +111,17 @@ void Zerberus::trigger(Channel* channel, int key, int velo, Trigger trigger, int
                                     }
                               }
                         }
+
+                  if (freeVoices.empty()) {
+                        qDebug("Zerberus: out of voices...");
+                        return;
+                        }
+
+                  Voice* voice = freeVoices.pop();
+                  Q_ASSERT(voice->isOff());
+                  voice->start(channel, key, velo, z, durSinceNoteOn);
+                  voice->setNext(activeVoices);
+                  activeVoices = voice;
                   }
             }
       }
@@ -136,9 +137,8 @@ void Zerberus::processNoteOff(Channel* cp, int key)
                && (v->key() == key)
                && (v->loopMode() != LoopMode::ONE_SHOT)
                ) {
-                  if (cp->sustain() < 0x40) {
-                        if (!v->isStopped())
-                              v->stop();
+                  if (cp->sustain() < 0x40 && !v->isStopped()) {
+                        v->stop();
                         double durSinceNoteOn = v->getSamplesSinceStart() / sampleRate();
                         trigger(cp, key, v->velocity(), Trigger::RELEASE, -1, -1, durSinceNoteOn);
                         }
