@@ -6,12 +6,12 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>228</width>
-    <height>97</height>
+    <width>218</width>
+    <height>106</height>
    </rect>
   </property>
   <property name="accessibleName">
-   <string>Clef Inspector</string>
+   <string>Stem Inspector</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="spacing">
@@ -78,6 +78,9 @@
       </property>
       <item row="0" column="1">
        <widget class="QDoubleSpinBox" name="lineWidth">
+        <property name="accessibleName">
+         <string>Line width</string>
+        </property>
         <property name="suffix">
          <string>sp</string>
         </property>
@@ -86,27 +89,16 @@
         </property>
        </widget>
       </item>
-      <item row="0" column="2">
-       <widget class="QToolButton" name="resetLineWidth">
-        <property name="toolTip">
-         <string>Reset to default</string>
-        </property>
-        <property name="accessibleName">
-         <string>Reset 'Line width' value</string>
-        </property>
-        <property name="text">
-         <string notr="true"/>
-        </property>
-        <property name="icon">
-         <iconset resource="../musescore.qrc">
-          <normaloff>:/data/icons/edit-reset.svg</normaloff>:/data/icons/edit-reset.svg</iconset>
-        </property>
-       </widget>
-      </item>
       <item row="0" column="0">
        <widget class="QLabel" name="label">
         <property name="text">
          <string>Line width:</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
+        <property name="buddy">
+         <cstring>lineWidth</cstring>
         </property>
        </widget>
       </item>
@@ -115,6 +107,9 @@
         <property name="text">
          <string>Length offset:</string>
         </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
         <property name="buddy">
          <cstring>userLength</cstring>
         </property>
@@ -122,6 +117,9 @@
       </item>
       <item row="1" column="1">
        <widget class="QDoubleSpinBox" name="userLength">
+        <property name="accessibleName">
+         <string>Length offset</string>
+        </property>
         <property name="suffix">
          <string>sp</string>
         </property>
@@ -133,31 +131,25 @@
         </property>
        </widget>
       </item>
+      <item row="0" column="2">
+       <widget class="Ms::ResetButton" name="resetLineWidth"/>
+      </item>
       <item row="1" column="2">
-       <widget class="QToolButton" name="resetUserLength">
-        <property name="toolTip">
-         <string>Reset to default</string>
-        </property>
-        <property name="accessibleName">
-         <string>Reset 'Length offset' value</string>
-        </property>
-        <property name="text">
-         <string notr="true"/>
-        </property>
-        <property name="icon">
-         <iconset resource="../musescore.qrc">
-          <normaloff>:/data/icons/edit-reset.svg</normaloff>:/data/icons/edit-reset.svg</iconset>
-        </property>
-        <property name="buddy" stdset="0">
-         <cstring>lineWidth</cstring>
-        </property>
-       </widget>
+       <widget class="Ms::ResetButton" name="resetUserLength"/>
       </item>
      </layout>
     </widget>
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>Ms::ResetButton</class>
+   <extends>QWidget</extends>
+   <header>inspector/resetButton.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources>
   <include location="../musescore.qrc"/>
  </resources>

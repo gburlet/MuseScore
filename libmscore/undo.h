@@ -64,8 +64,7 @@ class MeasureBase;
 class Dynamic;
 class Selection;
 class Text;
-struct Channel;
-class TextStyle;
+class Channel;
 class Tuplet;
 class KeySig;
 class TimeSig;
@@ -114,21 +113,46 @@ class UndoCommand {
       };
 
 //---------------------------------------------------------
+//   UndoMacro
+//    A root element for undo macro which is stored
+//    directly in UndoStack
+//---------------------------------------------------------
+
+class UndoMacro : public UndoCommand {
+      InputState undoInputState;
+      InputState redoInputState;
+      Element* undoSelectedElement = nullptr;
+      Element* redoSelectedElement = nullptr;
+      Score* score;
+
+      static Element* selectedElement(const Selection&);
+
+   public:
+      UndoMacro(Score* s);
+      virtual void undo(EditData*) override;
+      virtual void redo(EditData*) override;
+      bool empty() const { return childCount() == 0; }
+      UNDO_NAME("UndoMacro");
+      };
+
+//---------------------------------------------------------
 //   UndoStack
 //---------------------------------------------------------
 
 class UndoStack {
-      UndoCommand* curCmd;
-      QList<UndoCommand*> list;
+      UndoMacro* curCmd;
+      QList<UndoMacro*> list;
+      std::vector<int> stateList;
+      int nextState;
+      int cleanState;
       int curIdx;
-      int cleanIdx;
 
    public:
       UndoStack();
       ~UndoStack();
 
       bool active() const           { return curCmd != 0; }
-      void beginMacro();
+      void beginMacro(Score*);
       void endMacro(bool rollback);
       void push(UndoCommand*, EditData*);      // push & execute
       void push1(UndoCommand*);
@@ -136,34 +160,17 @@ class UndoStack {
       void setClean();
       bool canUndo() const          { return curIdx > 0;           }
       bool canRedo() const          { return curIdx < list.size(); }
-      bool isClean() const          { return cleanIdx == curIdx;   }
+      int state() const             { return stateList[curIdx];    }
+      bool isClean() const          { return cleanState == state();     }
       int getCurIdx() const         { return curIdx; }
       void remove(int idx);
       bool empty() const            { return !canUndo() && !canRedo();  }
-      UndoCommand* current() const  { return curCmd;               }
-      UndoCommand* last() const     { return curIdx > 0 ? list[curIdx-1] : 0; }
+      UndoMacro* current() const    { return curCmd;               }
+      UndoMacro* last() const       { return curIdx > 0 ? list[curIdx-1] : 0; }
       void undo(EditData*);
       void redo(EditData*);
       void rollback();
       void reopen();
-      };
-
-//---------------------------------------------------------
-//   SaveState
-//---------------------------------------------------------
-
-class SaveState : public UndoCommand {
-      InputState undoInputState;
-      InputState redoInputState;
-      Selection  undoSelection;
-      Selection  redoSelection;
-      Score* score;
-
-   public:
-      SaveState(Score*);
-      virtual void undo(EditData*) override;
-      virtual void redo(EditData*) override;
-      UNDO_NAME("SaveState")
       };
 
 //---------------------------------------------------------
@@ -348,11 +355,12 @@ class ChangeKeySig : public UndoCommand {
       KeySig* keysig;
       KeySigEvent ks;
       bool showCourtesy;
+      bool evtInStaff;
 
       void flip(EditData*) override;
 
    public:
-      ChangeKeySig(KeySig* k, KeySigEvent newKeySig, bool sc) : keysig(k), ks(newKeySig), showCourtesy(sc) {}
+      ChangeKeySig(KeySig* k, KeySigEvent newKeySig, bool sc, bool addEvtToStaff = true);
       UNDO_NAME("ChangeKeySig")
       };
 
@@ -696,6 +704,8 @@ class ChangeMStaffProperties : public UndoCommand {
 class InsertRemoveMeasures : public UndoCommand {
       MeasureBase* fm;
       MeasureBase* lm;
+
+      static std::vector<Clef*> getCourtesyClefs(Measure* m);
 
    protected:
       void removeMeasures();
@@ -1123,6 +1133,23 @@ class InsertTime : public UndoCommand {
       };
 
 //---------------------------------------------------------
+//   InsertTimeUnmanagedSpanner
+//---------------------------------------------------------
+
+class InsertTimeUnmanagedSpanner : public UndoCommand {
+      Score* score;
+      int tick;
+      int len;
+
+      void flip(EditData*) override;
+
+   public:
+      InsertTimeUnmanagedSpanner(Score* s, int _tick, int _len)
+         : score(s), tick(_tick), len(_len) {}
+      UNDO_NAME("InsertTimeUnmanagedSpanner")
+      };
+
+//---------------------------------------------------------
 //   ChangeNoteEvent
 //---------------------------------------------------------
 
@@ -1181,39 +1208,6 @@ class Link : public LinkUnlink {
       virtual void redo(EditData*) override { link();   }
       UNDO_NAME("Link")
       };
-
-#if 0
-//---------------------------------------------------------
-//   LinkStaff
-//---------------------------------------------------------
-
-class LinkStaff : public UndoCommand {
-      Staff* s1;
-      Staff* s2;
-
-   public:
-      LinkStaff(Staff* _s1, Staff* _s2) : s1(_s1), s2(_s2) {}
-      virtual void undo(EditData*) override { s2->unlink(s1); } // s1 is removed
-      virtual void redo(EditData*) override { s1->linkTo(s2); } // s1 is added
-      UNDO_NAME("LinkStaff")
-      };
-
-
-//---------------------------------------------------------
-//   UnlinkStaff
-//---------------------------------------------------------
-
-class UnlinkStaff : public UndoCommand {
-      Staff* s1;
-      Staff* s2;
-
-   public:
-      UnlinkStaff(Staff* _s1, Staff* _s2) : s1(_s1), s2(_s2) {}
-      virtual void undo(EditData*) override { s2->linkTo(s1); } // s2 is added
-      virtual void redo(EditData*) override { s1->unlink(s2); } // s2 is removed
-      UNDO_NAME("UnlinkStaff")
-      };
-#endif
 
 //---------------------------------------------------------
 //   ChangeStartEndSpanner
@@ -1274,6 +1268,38 @@ class ChangeGap : public UndoCommand {
    public:
       ChangeGap(Rest* r, bool v) : rest(r), v(v) {}
       UNDO_NAME("ChangeGap")
+      };
+
+//---------------------------------------------------------
+//   FretDot
+//---------------------------------------------------------
+
+class FretDot : public UndoCommand {
+      FretDiagram* fret;
+      int string;
+      int dot;
+
+      void flip(EditData*) override;
+
+   public:
+      FretDot(FretDiagram* f, int _string, int _dot) : fret(f), string(_string), dot(_dot) {}
+      UNDO_NAME("FretDot")
+      };
+
+//---------------------------------------------------------
+//   FretMarker
+//---------------------------------------------------------
+
+class FretMarker : public UndoCommand {
+      FretDiagram* fret;
+      int string;
+      int marker;
+
+      void flip(EditData*) override;
+
+   public:
+      FretMarker(FretDiagram* f, int _string, int _marker) : fret(f), string(_string), marker(_marker) {}
+      UNDO_NAME("FretMarker")
       };
 
 }     // namespace Ms

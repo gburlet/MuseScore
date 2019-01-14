@@ -120,7 +120,7 @@ void CmdState::setUpdateMode(UpdateMode m)
 //---------------------------------------------------------
 //   startCmd
 ///   Start a GUI command by clearing the redraw area
-///   and starting a user-visble undo.
+///   and starting a user-visible undo.
 //---------------------------------------------------------
 
 void Score::startCmd()
@@ -132,13 +132,11 @@ void Score::startCmd()
 
       // Start collecting low-level undo operations for a
       // user-visible undo action.
-
       if (undoStack()->active()) {
             qDebug("Score::startCmd(): cmd already active");
             return;
             }
-      undoStack()->beginMacro();
-      undo(new SaveState(this));
+      undoStack()->beginMacro(this);
       }
 
 //---------------------------------------------------------
@@ -147,7 +145,8 @@ void Score::startCmd()
 
 void Score::undoRedo(bool undo, EditData* ed)
       {
-      deselectAll();
+      if (readOnly())
+            return;
       cmdState().reset();
       if (undo)
             undoStack()->undo(ed);
@@ -170,7 +169,7 @@ void Score::endCmd(bool rollback)
             update();
             return;
             }
-      if (MScore::_error != MS_NO_ERROR)
+      if (readOnly() || MScore::_error != MS_NO_ERROR)
             rollback = true;
 
       if (rollback)
@@ -180,7 +179,7 @@ void Score::endCmd(bool rollback)
 
       if (MScore::debugMode)
             qDebug("===endCmd() %d", undoStack()->current()->childCount());
-      bool noUndo = undoStack()->current()->childCount() <= 1;       // nothing to undo?
+      const bool noUndo = undoStack()->current()->empty();       // nothing to undo?
       undoStack()->endMacro(noUndo);
 
       if (dirty()) {
@@ -312,8 +311,7 @@ void Score::cmdAddSpanner(Spanner* spanner, const QPointF& pos)
             spanner->setTick(m->tick());
             spanner->setTick2(m->endTick());
             }
-      qDeleteAll(spanner->spannerSegments());
-      spanner->spannerSegments().clear();
+      spanner->eraseSpannerSegments();
 
       undoAddElement(spanner);
       select(spanner, SelectType::SINGLE, 0);
@@ -329,6 +327,8 @@ void Score::cmdAddSpanner(Spanner* spanner, int staffIdx, Segment* startSegment,
       int track = staffIdx * VOICES;
       spanner->setTrack(track);
       spanner->setTrack2(track);
+      for (auto ss : spanner->spannerSegments())
+            ss->setTrack(track);
       spanner->setTick(startSegment->tick());
       int tick2;
       if (!endSegment)
@@ -628,8 +628,8 @@ Segment* Score::setNoteRest(Segment* segment, int track, NoteVal nval, Fraction 
                   dl = toRhythmicDurationList(dd, isRest, segment->rtick(), sigmap()->timesig(tick).nominal(), measure, 1);
             else
                   dl = toDurationList(dd, true);
-            int n = dl.size();
-            for (int i = 0; i < n; ++i) {
+            size_t n = dl.size();
+            for (size_t i = 0; i < n; ++i) {
                   const TDuration& d = dl[i];
                   ChordRest* ncr;
                   Note* note = 0;
@@ -712,8 +712,8 @@ Segment* Score::setNoteRest(Segment* segment, int track, NoteVal nval, Fraction 
                   //
                   Chord* chord = toNote(nr)->chord();
                   _is.slur()->undoChangeProperty(Pid::SPANNER_TICKS, chord->tick() - _is.slur()->tick());
-                  for (ScoreElement* e : _is.slur()->linkList()) {
-                        Slur* slur = toSlur(e);
+                  for (ScoreElement* se : _is.slur()->linkList()) {
+                        Slur* slur = toSlur(se);
                         for (ScoreElement* ee : chord->linkList()) {
                               Element* e = static_cast<Element*>(ee);
                               if (e->score() == slur->score() && e->track() == slur->track2()) {
@@ -870,7 +870,7 @@ Fraction Score::makeGap(Segment* segment, int track, const Fraction& _sd, Tuplet
                               }
                         }
                   else {
-                        for (int i = dList.size() - 1; i >= 0; --i) {
+                        for (int i = int(dList.size()) - 1; i >= 0; --i) {
                               if (ltuplet) {
                                     // take care not to recreate tuplet we just deleted
                                     Rest* r = setRest(tick, track, dList[i].fraction(), false, 0, false);
@@ -959,7 +959,7 @@ bool Score::makeGapVoice(Segment* seg, int track, Fraction len, int tick)
             Fraction srcF = cr1->duration();
             Fraction dstF = Fraction::fromTicks(tick - cr1->tick());
             std::vector<TDuration> dList = toDurationList(dstF, true);
-            int n = dList.size();
+            size_t n = dList.size();
             undoChangeChordRestLen(cr1, TDuration(dList[0]));
             if (n > 1) {
                   int crtick = cr1->tick() + cr1->actualTicks();
@@ -967,7 +967,7 @@ bool Score::makeGapVoice(Segment* seg, int track, Fraction len, int tick)
                   if (cr1->type() == ElementType::CHORD) {
                         // split Chord
                         Chord* c = toChord(cr1);
-                        for (int i = 1; i < n; ++i) {
+                        for (size_t i = 1; i < n; ++i) {
                               TDuration d = dList[i];
                               Chord* c2 = addChord(crtick, d, c, true, c->tuplet());
                               c = c2;
@@ -978,7 +978,7 @@ bool Score::makeGapVoice(Segment* seg, int track, Fraction len, int tick)
                   else {
                         // split Rest
                         Rest* r       = toRest(cr1);
-                        for (int i = 1; i < n; ++i) {
+                        for (size_t i = 1; i < n; ++i) {
                               TDuration d = dList[i];
                               Rest* r2      = toRest(r->clone());
                               r2->setDuration(d.fraction());
@@ -1029,11 +1029,11 @@ bool Score::makeGapVoice(Segment* seg, int track, Fraction len, int tick)
                   }
             // first segment in measure was removed, have to recreate it
             Segment* s = m->undoGetSegment(SegmentType::ChordRest, m->tick());
-            int track  = cr->track();
-            cr = toChordRest(s->element(track));
+            int t  = cr->track();
+            cr = toChordRest(s->element(t));
             if (cr == 0) {
-                  addRest(s, track, TDuration(TDuration::DurationType::V_MEASURE), 0);
-                  cr = toChordRest(s->element(track));
+                  addRest(s, t, TDuration(TDuration::DurationType::V_MEASURE), 0);
+                  cr = toChordRest(s->element(t));
                   }
             }
       return true;
@@ -1069,7 +1069,8 @@ QList<Fraction> Score::splitGapToMeasureBoundaries(ChordRest* cr, Fraction gap)
       Segment* s = cr->segment();
       while (gap > Fraction(0)) {
             Measure* m    = s->measure();
-            Fraction rest = Fraction::fromTicks(m->ticks() - s->rtick());
+            Fraction timeStretch = cr->staff()->timeStretch(s->tick());
+            Fraction rest = (m->len() - s->rfrac()) * timeStretch;
             if (rest >= gap) {
                   flist.append(gap);
                   return flist;
@@ -1100,6 +1101,11 @@ void Score::changeCRlen(ChordRest* cr, const TDuration& d)
 
 void Score::changeCRlen(ChordRest* cr, const Fraction& dstF, bool fillWithRest)
       {
+      if (cr->isRepeatMeasure()) {
+            // it is not clear what should this
+            // operation mean for measure repeats.
+            return;
+            }
       Fraction srcF(cr->duration());
       if (srcF == dstF)
             return;
@@ -1220,7 +1226,7 @@ void Score::changeCRlen(ChordRest* cr, const Fraction& dstF, bool fillWithRest)
                               }
                         }
                   else {
-                        for (int i = dList.size() - 1; i >= 0; --i) {
+                        for (int i = int(dList.size()) - 1; i >= 0; --i) {
                               bool genTie;
                               Chord* cc;
                               if (oc) {
@@ -1318,7 +1324,7 @@ static void setTpc(Note* oNote, int tpc, int& newTpc1, int& newTpc2)
 ///   Increment/decrement pitch of note by one or by an octave.
 //---------------------------------------------------------
 
-void Score::upDown(bool up, UpDownMode mode)
+void Score::upDown(bool up, UpDownMode mode, bool updateSelection)
       {
       QList<Note*> el = selection().uniqueNotes();
 
@@ -1341,7 +1347,7 @@ void Score::upDown(bool up, UpDownMode mode)
                         {
                         const Drumset* ds = part->instrument()->drumset();
                         if (ds) {
-                              newPitch = up ? ds->prevPitch(pitch) : ds->nextPitch(pitch);
+                              newPitch = up ? ds->nextPitch(pitch) : ds->prevPitch(pitch);
                               newTpc1 = pitch2tpc(newPitch, Key::C, Prefer::NEAREST);
                               newTpc2 = newTpc1;
                               }
@@ -1353,7 +1359,7 @@ void Score::upDown(bool up, UpDownMode mode)
                         switch (mode) {
                               case UpDownMode::OCTAVE:          // move same note to next string, if possible
                                     {
-                                    StaffType* stt = staff->staffType(tick);
+                                    const StaffType* stt = staff->staffType(tick);
                                     string = stt->physStringToVisual(string);
                                     string += (up ? -1 : 1);
                                     if (string < 0 || string >= stringData->strings())
@@ -1487,9 +1493,29 @@ void Score::upDown(bool up, UpDownMode mode)
             setPlayNote(true);
             }
 
-      _selection.clear();
-      for (Note* note : el)
-            _selection.add(note);
+      if (updateSelection) {
+            _selection.clear();
+            for (Note* note : el)
+                  _selection.add(note);
+            }
+      }
+
+//---------------------------------------------------------
+//   upDownDelta
+///   Add the delta to the pitch of note.
+//---------------------------------------------------------
+
+void Score::upDownDelta(int pitchDelta, bool updateSelection)
+      {
+      while (pitchDelta > 0) {
+            upDown(true, UpDownMode::CHROMATIC, updateSelection);
+            pitchDelta--;
+            }
+
+      while (pitchDelta < 0) {
+            upDown(false, UpDownMode::CHROMATIC, updateSelection);
+            pitchDelta++;
+            }
       }
 
 //---------------------------------------------------------
@@ -1648,15 +1674,17 @@ void Score::changeAccidental(Note* note, AccidentalType accidental)
             if (forceRemove) {
                   if (a)
                         lns->undoRemoveElement(a);
+                  if (ln->tieBack())
+                        continue;
                   }
             else if (forceAdd) {
                   if (a)
                         undoRemoveElement(a);
-                  Accidental* a = new Accidental(lns);
-                  a->setParent(ln);
-                  a->setAccidentalType(accidental);
-                  a->setRole(AccidentalRole::USER);
-                  lns->undoAddElement(a);
+                  Accidental* a1 = new Accidental(lns);
+                  a1->setParent(ln);
+                  a1->setAccidentalType(accidental);
+                  a1->setRole(AccidentalRole::USER);
+                  lns->undoAddElement(a1);
                   }
             changeAccidental2(ln, pitch, tpc);
             }
@@ -1831,6 +1859,15 @@ void Score::cmdResetBeamMode()
       }
 
 //---------------------------------------------------------
+//   cmdResetStyle
+//---------------------------------------------------------
+
+void Score::cmdResetStyle()
+      {
+      style().reset(this);
+      }
+
+//---------------------------------------------------------
 //   cmdResetNoteAndRestGroupings
 //---------------------------------------------------------
 
@@ -1858,6 +1895,34 @@ void Score::cmdResetNoteAndRestGroupings()
                         regroupNotesAndRests(sTick, eTick, track);
                   }
             }
+      endCmd();
+      }
+
+//---------------------------------------------------------
+//   resetElementShapePosition
+//    For use with Score::scanElements.
+//    Reset positions and autoplacement for the given
+//    element.
+//---------------------------------------------------------
+
+static void resetElementPosition(void*, Element* e)
+      {
+      if (e->generated())
+            return;
+      e->undoResetProperty(Pid::AUTOPLACE);
+      e->undoResetProperty(Pid::OFFSET);
+      if (e->isSpanner())
+            e->undoResetProperty(Pid::OFFSET2);
+      }
+
+//---------------------------------------------------------
+//   cmdResetAllPositions
+//---------------------------------------------------------
+
+void Score::cmdResetAllPositions()
+      {
+      startCmd();
+      scanElements(nullptr, resetElementPosition);
       endCmd();
       }
 
@@ -1899,7 +1964,7 @@ bool Score::processMidiInput()
                               ev.pitch += p->instrument(selection().tickStart())->transpose().chromatic;
                               }
                         MScore::seq->startNote(
-                                          p->instrument()->channel(0)->channel,
+                                          p->instrument()->channel(0)->channel(),
                                           ev.pitch,
                                           ev.velocity,
                                           0.0);
@@ -1934,6 +1999,14 @@ bool Score::processMidiInput()
                         ev.chord = false;
                   else
                         ev.chord = true;
+
+                  // holding shift while inputting midi will add the new pitch to the prior existing chord
+                  if (qApp->keyboardModifiers() & Qt::ShiftModifier) {
+                        Element* cr = _is.lastSegment()->element(_is.track());
+                        if (cr && cr->isChord())
+                              ev.chord = true;
+                        }
+
                   // TODO: add shadow note instead of real note in realtime modes
                   // (note becomes real when realtime-advance triggered).
                   addMidiPitch(ev.pitch, ev.chord);
@@ -2012,7 +2085,7 @@ Element* Score::move(const QString& cmd)
                                     return 0;
                               }
                         // segment for sure contains chords/rests,
-                        int size = seg->elist().size();
+                        int size = int(seg->elist().size());
                         // if segment has a chord/rest in original element track, use it
                         if (track > -1 && track < size && seg->element(track)) {
                               trg  = seg->element(track);
@@ -2145,8 +2218,7 @@ Element* Score::move(const QString& cmd)
             if (noteEntryMode()) {
                   // if cursor moved into a gap, selection cannot follow
                   // only select & play el if it was not already selected (does not normally happen)
-                  ChordRest* cr = _is.cr();
-                  if (cr || !el->selected())
+                  if (_is.cr() || !el->selected())
                         select(el, SelectType::SINGLE, 0);
                   else
                         setPlayNote(false);
@@ -2309,12 +2381,12 @@ void Score::cmdAddBracket()
 
 void Score::cmdMoveRest(Rest* rest, Direction dir)
       {
-      QPointF pos(rest->userOff());
+      QPointF pos(rest->offset());
       if (dir == Direction::UP)
             pos.ry() -= spatium();
       else if (dir == Direction::DOWN)
             pos.ry() += spatium();
-      rest->undoChangeProperty(Pid::USER_OFF, pos);
+      rest->undoChangeProperty(Pid::OFFSET, pos);
       }
 
 //---------------------------------------------------------
@@ -2323,26 +2395,10 @@ void Score::cmdMoveRest(Rest* rest, Direction dir)
 
 void Score::cmdMoveLyrics(Lyrics* lyrics, Direction dir)
       {
-      ChordRest* cr       = lyrics->chordRest();
-      int verse           = lyrics->no();
-      Placement placement = lyrics->placement();
-      int newVerse;
-      if (lyrics->placeAbove())
-            dir = (dir == Direction::UP) ? Direction::DOWN : Direction::UP;
-
-      if (dir == Direction::UP) {
-            if (verse)
-                  newVerse = verse - 1;
-            else
-                  return;
-            }
-      else
-            newVerse = verse + 1;
-      Lyrics* nl = cr->lyrics(newVerse, placement);
-      if (nl)
-            nl->undoChangeProperty(Pid::VERSE, verse);
-      lyrics->undoChangeProperty(Pid::VERSE, newVerse);
-      score()->setLayout(cr->tick());
+      int verse = lyrics->no() + (dir == Direction::UP ? -1 : 1);
+      if (verse < 0)
+            return;
+      lyrics->undoChangeProperty(Pid::VERSE, verse);
       }
 
 //---------------------------------------------------------
@@ -2433,16 +2489,14 @@ void Score::cmdExplode()
                   lastStaff = qMin(nstaves(), srcStaff + n);
                   }
 
-            // make our own copy of selection, since pasting modifies actual selection
-            Selection srcSelection(selection());
-
+            const QByteArray mimeData(selection().mimeData());
             // copy to all destination staves
             Segment* firstCRSegment = startMeasure->tick2segment(startMeasure->tick());
             for (int i = 1; srcStaff + i < lastStaff; ++i) {
                   int track = (srcStaff + i) * VOICES;
                   ChordRest* cr = toChordRest(firstCRSegment->element(track));
                   if (cr) {
-                        XmlReader e(srcSelection.mimeData());
+                        XmlReader e(mimeData);
                         e.setPasteMode(true);
                         pasteStaff(e, cr->segment(), cr->staffIdx());
                         }
@@ -2456,7 +2510,7 @@ void Score::cmdExplode()
                         if (e && e->type() == ElementType::CHORD) {
                               Chord* c = toChord(e);
                               std::vector<Note*> notes = c->notes();
-                              int nnotes = notes.size();
+                              int nnotes = int(notes.size());
                               // keep note "i" from top, which is backwards from nnotes - 1
                               // reuse notes if there are more instruments than notes
                               int stavesPerNote = qMax((lastStaff - srcStaff) / nnotes, 1);
@@ -2550,6 +2604,8 @@ void Score::cmdImplode()
       Segment* endSegment = selection().endSegment();
       Measure* startMeasure = startSegment->measure();
       Measure* endMeasure = endSegment ? endSegment->measure() : lastMeasure();
+      int startTick       = startSegment->tick();
+      int endTick         = endSegment ? endSegment->tick() : lastMeasure()->endTick();
 
       // if single staff selected, combine voices
       // otherwise combine staves
@@ -2608,48 +2664,43 @@ void Score::cmdImplode()
                                     undoRemoveElement(src);
                               }
                         }
+                  // TODO - use first voice that actually has a note and implode remaining voices on it?
+                  // see https://musescore.org/en/node/174111
                   else if (dst) {
                         // destination track has something, but it isn't a chord
-                        // remove everything from other voices if in "voice mode"
+                        // remove rests from other voices if in "voice mode"
                         for (int i = 1; i < VOICES; ++i) {
                               Element* e = s->element(dstTrack + i);
-                              if (e)
+                              if (e && e->isRest())
                                     undoRemoveElement(e);
                               }
                         }
                   }
+            // delete orphaned spanners (TODO: figure out solution to reconnect orphaned spanners to their cloned notes)
+            checkSpanner(startTick, endTick);
             }
       else {
             int tracks[VOICES];
             for (int i = 0; i < VOICES; i++)
                   tracks[i] = -1;
             int full = 0;
-            int lTick;
-            if (endSegment)
-                  lTick = endSegment->tick();
-            else
-                  lTick = lastMeasure()->endTick();
-            for (Segment* seg = startSegment; seg && seg->tick() < lTick; seg = seg->next1()) {
-                  for (int i = startTrack; i < endTrack && full != VOICES; i++) {
-                        bool t = true;
-                        for (int j = 0; j < VOICES; j++) {
-                              if (i == tracks[j]) {
-                                    t = false;
-                                    break;
-                                    }
-                              }
 
-                        if (!seg->measure()->hasVoice(i) || seg->measure()->isOnlyRests(i) || !t)
-                              continue;
-                        tracks[full] = i;
-                        full++;
+            // identify tracks to combine, storing the source track numbers in tracks[]
+            // first four non-empty tracks to win
+            for (int track = startTrack; track < endTrack && full < VOICES; ++track) {
+                  for (Measure* m = startMeasure; m && m != endMeasure; m = m->nextMeasure()) {
+                        if (m->hasVoice(track) && !m->isOnlyRests(track)) {
+                              tracks[full++] = track;
+                              break;
+                              }
                         }
                   }
 
+            // clone source tracks into destination
             for (int i = dstTrack; i < dstTrack + VOICES; i++) {
                   int strack = tracks[i % VOICES];
                   if (strack != -1 && strack != i) {
-                        undo( new CloneVoice(startSegment, lTick, startSegment, strack, i, i, false));
+                        undo( new CloneVoice(startSegment, endTick, startSegment, strack, i, i, false));
                         }
                   }
             }
@@ -2787,11 +2838,11 @@ void Score::cmdSlashRhythm()
       QList<Chord*> chords;
       // loop through all notes in selection
       foreach (Element* e, selection().elements()) {
-            if (e->voice() >= 2 && e->type() == ElementType::REST) {
+            if (e->voice() >= 2 && e->isRest()) {
                   Rest* r = toRest(e);
                   if (r->links()) {
-                        for (ScoreElement* e : *r->links()) {
-                              Rest* lr = toRest(e);
+                        for (ScoreElement* se : *r->links()) {
+                              Rest* lr = toRest(se);
                               lr->setAccent(!lr->accent());
                               }
                         }
@@ -2799,7 +2850,7 @@ void Score::cmdSlashRhythm()
                         r->setAccent(!r->accent());
                   continue;
                   }
-            else if (e->type() == ElementType::NOTE) {
+            else if (e->isNote()) {
                   Note* n = toNote(e);
                   if (n->noteType() != NoteType::NORMAL)
                         continue;
@@ -2810,8 +2861,8 @@ void Score::cmdSlashRhythm()
                   chords.append(c);
                   // toggle slash setting
                   if (c->links()) {
-                        for (ScoreElement* e : *c->links()) {
-                              Chord* lc = toChord(e);
+                        for (ScoreElement* se : *c->links()) {
+                              Chord* lc = toChord(se);
                               lc->setSlash(!lc->slash(), false);
                               }
                         }
@@ -2954,7 +3005,7 @@ void Score::cmdPitchUp()
       if (el && el->isLyrics())
             cmdMoveLyrics(toLyrics(el), Direction::UP);
       else if (el && (el->isArticulation() || el->isTextBase()))
-            el->undoChangeProperty(Pid::USER_OFF, el->userOff() + QPointF(0.0, -MScore::nudgeStep * el->spatium()));
+            el->undoChangeProperty(Pid::OFFSET, el->offset() + QPointF(0.0, -MScore::nudgeStep * el->spatium()));
       else if (el && el->isRest())
             cmdMoveRest(toRest(el), Direction::UP);
       else
@@ -2971,7 +3022,7 @@ void Score::cmdPitchDown()
       if (el && el->isLyrics())
             cmdMoveLyrics(toLyrics(el), Direction::DOWN);
       else if (el && (el->isArticulation() || el->isTextBase()))
-            el->undoChangeProperty(Pid::USER_OFF, el->userOff() + QPointF(0.0, MScore::nudgeStep * el->spatium()));
+            el->undoChangeProperty(Pid::OFFSET, el->offset() + QPointF(0.0, MScore::nudgeStep * el->spatium()));
       else if (el && el->isRest())
             cmdMoveRest(toRest(el), Direction::DOWN);
       else
@@ -3005,7 +3056,7 @@ void Score::cmdPitchUpOctave()
       {
       Element* el = selection().element();
       if (el && (el->isArticulation() || el->isTextBase()))
-            el->undoChangeProperty(Pid::USER_OFF, el->userOff() + QPointF(0.0, -MScore::nudgeStep10 * el->spatium()));
+            el->undoChangeProperty(Pid::OFFSET, el->offset() + QPointF(0.0, -MScore::nudgeStep10 * el->spatium()), PropertyFlags::UNSTYLED);
       else
             upDown(true, UpDownMode::OCTAVE);
       }
@@ -3018,7 +3069,7 @@ void Score::cmdPitchDownOctave()
       {
       Element* el = selection().element();
       if (el && (el->isArticulation() || el->isTextBase()))
-            el->undoChangeProperty(Pid::USER_OFF, el->userOff() + QPointF(0.0, MScore::nudgeStep10 * el->spatium()));
+            el->undoChangeProperty(Pid::OFFSET, el->offset() + QPointF(0.0, MScore::nudgeStep10 * el->spatium()), PropertyFlags::UNSTYLED);
       else
             upDown(false, UpDownMode::OCTAVE);
       }
@@ -3345,7 +3396,7 @@ void Score::cmdAddPitch(const EditData& ed, int note, bool addFlag, bool insert)
                   int curPitch = 60;
                   if (is.segment()) {
                         Staff* staff = Score::staff(is.track() / VOICES);
-                        Segment* seg = is.segment()->prev1(SegmentType::ChordRest | SegmentType::Clef);
+                        Segment* seg = is.segment()->prev1(SegmentType::ChordRest | SegmentType::Clef | SegmentType::HeaderClef);
                         while (seg) {
                               if (seg->isChordRestType()) {
                                     Element* p = seg->element(is.track());
@@ -3354,7 +3405,7 @@ void Score::cmdAddPitch(const EditData& ed, int note, bool addFlag, bool insert)
                                           break;
                                           }
                                     }
-                              else if (seg->isClefType()) {
+                              else if (seg->isClefType() || seg->isHeaderClefType()) {
                                     Element* p = seg->element( (is.track() / VOICES) * VOICES); // clef on voice 1
                                     if (p && p->isClef()) {
                                           Clef* clef = toClef(p);
@@ -3387,6 +3438,7 @@ void Score::cmdAddPitch(const EditData& ed, int note, bool addFlag, bool insert)
 
 void Score::cmdAddPitch(int step, bool addFlag, bool insert)
       {
+      insert = insert || inputState().usingNoteEntryMethod(NoteEntryMethod::TIMEWISE);
       Position pos;
       if (addFlag) {
             Element* el = selection().element();
@@ -3558,6 +3610,7 @@ void Score::cmd(const QAction* a, EditData& ed)
             { "pad-note-64-TAB",            [this]{ padToggle(Pad::NOTE64);                                     }},
             { "pad-note-128",               [this]{ padToggle(Pad::NOTE128);                                    }},
             { "pad-note-128-TAB",           [this]{ padToggle(Pad::NOTE128);                                    }},
+            { "reset-style",                [this]{ cmdResetStyle();                                            }},
             { "reset-beammode",             [this]{ cmdResetBeamMode();                                         }},
             { "reset-groupings",            [this]{ cmdResetNoteAndRestGroupings();                             }},
             { "clef-violin",                [this]{ cmdInsertClef(ClefType::G);                                 }},

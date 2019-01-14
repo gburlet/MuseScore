@@ -3,7 +3,7 @@
 rem "magick compare" - image magick compare program
 
 set SRC=mmrest-1,bravura-mmrest,gonville-mmrest,mmrest-2,mmrest-4,mmrest-5,mmrest-6,mmrest-7,mmrest-8,mmrest-9, ^
- mmrest-10,fmrest-1,fmrest-2,fmrest-3,fmrest-4,fmrest-5,fmrest-6,measure-repeat-1, ^
+ mmrest-10,mmrest-11,fmrest-1,fmrest-2,fmrest-3,fmrest-4,fmrest-5,fmrest-6,measure-repeat-1, ^
  noteheadposition-1,valign-1,valign-2,valign-3, ^
  emmentaler-1,bravura-1,gonville-1, musejazz-1, ^
  emmentaler-2,bravura-2,gonville-2, musejazz-2, ^
@@ -25,8 +25,9 @@ set SRC=mmrest-1,bravura-mmrest,gonville-mmrest,mmrest-2,mmrest-4,mmrest-5,mmres
  chord-layout-11,chord-layout-12,chord-layout-13,chord-layout-14,chord-layout-15,chord-layout-16,chord-layout-17, ^
  cross-1,cross-2, ^
  accidental-1,accidental-2,accidental-3,accidental-4,accidental-5, ^
- accidental-6,accidental-7,accidental-8,accidental-9,accidental-10, accidental-mirror ^
- tie-1,tie-2,tie-3,grace-1,grace-2,grace-3,grace-4,tuplets-1,tuplets-2,breath-1, ^
+ accidental-6,accidental-7,accidental-8,accidental-9,accidental-10, accidental-mirror, ^
+ tie-1,tie-2,tie-3,grace-1,grace-2,grace-3,grace-4, ^
+ tuplets-1,tuplets-2,tuplets-3,tuplets-4,breath-1, ^
  harmony-1,harmony-2,harmony-3,harmony-4,harmony-5,harmony-6,harmony-7, ^
  harmony-8,harmony-9,harmony-10,harmony-11,harmony-12, ^
  beams-1,beams-2,beams-3,beams-4,beams-5,beams-6,beams-7,beams-8,beams-9,beams-10, ^
@@ -36,9 +37,26 @@ set SRC=mmrest-1,bravura-mmrest,gonville-mmrest,mmrest-2,mmrest-4,mmrest-5,mmres
  system-1,system-2,system-3,system-4,system-5,system-6,system-7,hide-1,small-1,tremolo-1, ^
  staff-1,staff-2, ^
  slashed_chord-layout-12, slashed_chord-layout-7, slashed_grace-3, slashed_noteheadposition-1, ^
- drumset-custom-1, read-206-custom-drumset-1
+ drumset-custom-1, read-206-custom-drumset-1, ^
+ layout-sequence-1, layout-sequence-2, layout-sequence-3, layout-sequence-4, ^
+ layout-sequence-5, layout-sequence-6, layout-sequence-7, layout-sequence-8, ^
+ layout-sequence-9, layout-sequence-10, layout-sequence-11, layout-sequence-12, ^
+ layout-sequence-13, layout-sequence-14, layout-sequence-15, layout-sequence-16
 
-set MSCORE=..\win32install\bin\musescore.exe
+IF NOT "%1"=="" (
+   SET INSTALL_PATH=%1
+   ) ELSE (
+   SET INSTALL_PATH=msvc.install_x64
+   )
+
+set MSCORE=..\%INSTALL_PATH%\bin\musescore.exe
+
+IF NOT EXIST ..\%INSTALL_PATH%\nul (
+   echo "Current folder: ..\%INSTALL_PATH%"
+   echo "MuseScore install folder not found"
+   goto :ERROR
+   )
+
 set DPI=130
 set F=vtest.html
 
@@ -91,3 +109,5 @@ echo ^</html^> >> %F%
 %F%
 cd ..
 @echo on
+
+:ERROR

@@ -126,8 +126,9 @@ void Voice::start(Channel* c, int key, int v, const Zone* zone, double durSinceN
       //    -> afterwards 0.5 (-6dB) is applied to compensate possible coherent
       //       signals in a stereo output see http://www.sengpielaudio.com/calculator-coherentsources.htm
       //    -> 0.005 = 0.01 * 0.5
-      gain        = (z->volume * z->group_volume) * (offset + z->ampVeltrack * curve)
-                    * .005 * c->gain() * rt_decay_value;
+      gain        = (z->volume * z->group_volume * z->global_volume) * (offset + z->ampVeltrack * curve)
+                    * .005 * c->gain() * rt_decay_value *
+                    pow(10.0, 4.5 / 20.0); //attenuated volume between Fluid and Zerberus on 4.5dB
 
       phase.set(0);
       float sr = float(s->sampleRate()) / _zerberus->sampleRate();
@@ -262,7 +263,7 @@ void Voice::process(int frames, float* p)
                   long long idx = phase.index() * 2;
                   if (idx >= eidx) {
                         off();
-                        // printf("end of sample\n");
+//printf("end of sample\n");
                         break;
                         }
 

@@ -63,7 +63,6 @@ class Fraction {
       Fraction operator+(const Fraction& v) const { return Fraction(*this) += v; }
       Fraction operator-(const Fraction& v) const { return Fraction(*this) -= v; }
       Fraction operator*(const Fraction& v) const { return Fraction(*this) *= v; }
-      Fraction operator*(int v)             const { return Fraction(*this) *= v; }
       Fraction operator/(const Fraction& v) const { return Fraction(*this) /= v; }
       Fraction operator/(int v)             const { return Fraction(*this) /= v; }
 
@@ -75,8 +74,12 @@ class Fraction {
       bool operator!=(const Fraction&) const;
 
       QString print() const { return QString("%1/%2").arg(_numerator).arg(_denominator); }
+      QString toString() const { return print(); }
       operator QVariant() const { return QVariant::fromValue(*this); }
       };
+
+inline Fraction operator*(const Fraction& f, int v) { return Fraction(f) *= v; }
+inline Fraction operator*(int v, const Fraction& f) { return Fraction(f) *= v; }
 
 #ifdef SCRIPT_INTERFACE
 

@@ -23,6 +23,8 @@ class ChordRest;
 class MuseScoreView;
 class Chord;
 class System;
+class Skyline;
+
 enum class SpannerSegmentType;
 
 struct BeamFragment;
@@ -94,7 +96,7 @@ class Beam final : public Element {
 
       virtual void reset() override;
 
-      System* system() const { return (System*)parent(); }
+      System* system() const { return toSystem(parent()); }
 
       void layout1();
       void layoutGraceNotes();
@@ -145,7 +147,9 @@ class Beam final : public Element {
 
       bool isGrace() const { return _isGrace; }  // for debugger
       bool cross() const   { return _cross; }
-      virtual Shape shape() const override;
+
+      void addSkyline(Skyline&);
+
       virtual void triggerLayout() const override;
       };
 

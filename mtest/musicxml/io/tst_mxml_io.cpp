@@ -1,7 +1,6 @@
 //=============================================================================
 //  MuseScore
 //  Music Composition & Notation
-//  $Id:$
 //
 //  Copyright (C) 2012-2014 Werner Schweer
 //
@@ -86,6 +85,9 @@ private slots:
       void figuredBass2() { mxmlIoTest("testFiguredBass2"); }
       void figuredBass3() { mxmlIoTest("testFiguredBass3"); }
       void formattedThings() { mxmlIoTest("testFormattedThings"); }
+      void fractionMinus() { mxmlIoTestRef("testFractionMinus"); }
+      void fractionPlus() { mxmlIoTestRef("testFractionPlus"); }
+      void fractionTicks() { mxmlIoTestRef("testFractionTicks"); }
       void grace1() { mxmlIoTest("testGrace1"); }
       void grace2() { mxmlIoTest("testGrace2"); }
       void harmony1() { mxmlIoTest("testHarmony1"); }
@@ -164,6 +166,7 @@ private slots:
       void tuplets2() { mxmlIoTestRef("testTuplets2"); }
       void tuplets3() { mxmlIoTestRef("testTuplets3"); }
       void tuplets4() { mxmlIoTest("testTuplets4"); }
+      void tuplets5() { mxmlIoTestRef("testTuplets5"); }
       void uninitializedDivisions() { mxmlIoTestRef("testUninitializedDivisions"); }
       void unusualDurations() { mxmlIoTestRef("testUnusualDurations"); }
       void virtualInstruments() { mxmlIoTestRef("testVirtualInstruments"); }

@@ -276,6 +276,7 @@ void Bracket::draw(QPainter* painter) const
 void Bracket::startEdit(EditData& ed)
       {
       Element::startEdit(ed);
+      ay1 = pagePos().y();
       ed.grips   = 1;
       ed.curGrip = Grip::START;
       }
@@ -295,7 +296,10 @@ void Bracket::updateGrips(EditData& ed) const
 
 void Bracket::endEdit(EditData& ed)
       {
-      endEditDrag(ed);
+//      endEditDrag(ed);
+      score()->setLayoutAll();
+      score()->update();
+      ed.element = 0;         // score layout invalidates element
       }
 
 //---------------------------------------------------------
@@ -315,7 +319,6 @@ void Bracket::editDrag(EditData& ed)
 
 void Bracket::endEditDrag(EditData&)
       {
-      qreal ay1 = pagePos().y();
       qreal ay2 = ay1 + h2 * 2;
 
       int staffIdx1 = staffIdx();
@@ -342,6 +345,9 @@ void Bracket::endEditDrag(EditData&)
       qreal ey = system()->staff(staffIdx2)->y() + score()->staff(staffIdx2)->height();
       h2 = (ey - sy) * .5;
       bracketItem()->undoChangeProperty(Pid::BRACKET_SPAN, staffIdx2 - staffIdx1 + 1);
+      // brackets do not survive layout
+      // make sure layout is not called:
+      score()->cmdState()._setUpdateMode(UpdateMode::Update);
       }
 
 //---------------------------------------------------------
@@ -350,7 +356,7 @@ void Bracket::endEditDrag(EditData&)
 
 bool Bracket::acceptDrop(EditData& data) const
       {
-      return data.element->type() == ElementType::BRACKET;
+      return data.dropElement->type() == ElementType::BRACKET;
       }
 
 //---------------------------------------------------------
@@ -359,7 +365,7 @@ bool Bracket::acceptDrop(EditData& data) const
 
 Element* Bracket::drop(EditData& data)
       {
-      Element* e = data.element;
+      Element* e = data.dropElement;
       Bracket* b = 0;
       if (e->isBracket()) {
             b = toBracket(e);
@@ -428,12 +434,24 @@ QVariant Bracket::propertyDefault(Pid id) const
       }
 
 //---------------------------------------------------------
+//   undoChangeProperty
+//---------------------------------------------------------
+
+void Bracket::undoChangeProperty(Pid id, const QVariant& v, PropertyFlags ps)
+      {
+      // brackets do not survive layout() and therefore cannot be on
+      // the undo stack; delegate to BracketItem:
+      BracketItem* bi = bracketItem();
+      bi->undoChangeProperty(id, v, ps);
+      }
+
+//---------------------------------------------------------
 //   setSelected
 //---------------------------------------------------------
 
 void Bracket::setSelected(bool f)
       {
-      _bi->setSelected(f);
+//      _bi->setSelected(f);
       Element::setSelected(f);
       }
 
@@ -446,16 +464,16 @@ void Bracket::write(XmlWriter& xml) const
       {
       switch (_bi->bracketType()) {
             case BracketType::BRACE:
-                  xml.stag("Bracket type=\"Brace\"");
+                  xml.stag(this, "type=\"Brace\"");
                   break;
             case BracketType::NORMAL:
-                  xml.stag("Bracket");
+                  xml.stag(this);
                   break;
             case BracketType::SQUARE:
-                  xml.stag("Bracket type=\"Square\"");
+                  xml.stag(this, "type=\"Square\"");
                   break;
             case BracketType::LINE:
-                  xml.stag("Bracket type=\"Line\"");
+                  xml.stag(this, "type=\"Line\"");
                   break;
             case BracketType::NO_BRACKET:
                   break;
